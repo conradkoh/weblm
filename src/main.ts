@@ -23,6 +23,10 @@ import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from './config';
 import type { ProgressCallback } from './engine/types';
 import type { ChatMessage } from './types';
 import { generateId } from './types';
+import { createModelSelectorUI, createLoadButtons } from './ui/model-selector';
+import { exportChatAsText, exportChatAsMarkdown } from './app/export';
+import { createChatPage, renderMessages } from './ui/chat-page';
+import { createFileHandlers } from './app/file-handler';
 
 // Application state
 let currentModelVariant: ModelVariant = DEFAULT_MODEL;
@@ -39,185 +43,44 @@ let chatMessagesContainer: HTMLElement | null = null;
 let uploadUI: ReturnType<typeof createUploadUI> | null = null;
 
 /**
- * Create the model selection UI.
- */
-function createModelSelectorUI(cachedModels: Set<ModelVariant>): HTMLElement {
-  const container = document.createElement('div');
-  container.id = 'model-selector-container';
-  container.setAttribute('role', 'radiogroup');
-  container.setAttribute('aria-label', 'Model selection');
-  container.innerHTML = '<h3 style="margin-bottom: var(--spacing-md);">Select a Model</h3>';
-
-  (['small', 'large'] as ModelVariant[]).forEach(model => {
-    const info = MODEL_INFO[model];
-    const isCached = cachedModels.has(model);
-
-    const optionDiv = document.createElement('div');
-    optionDiv.className = 'model-option';
-    optionDiv.setAttribute('data-model', model);
-    optionDiv.setAttribute('role', 'radio');
-    optionDiv.setAttribute('aria-checked', 'false');
-    optionDiv.setAttribute('tabindex', '0');
-
-    optionDiv.innerHTML = `
-      <span class="model-option-name">${info.name}</span>
-      <span class="model-option-info">${info.size}</span>
-      ${isCached ? '<span class="model-option-status">✓ Cached locally</span>' : ''}
-    `;
-
-    optionDiv.addEventListener('click', () => {
-      container.querySelectorAll('.model-option').forEach(el => {
-        el.classList.remove('selected');
-        el.setAttribute('aria-checked', 'false');
-      });
-      optionDiv.classList.add('selected');
-      optionDiv.setAttribute('aria-checked', 'true');
-      currentModelVariant = model;
-    });
-
-    // Keyboard support
-    optionDiv.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        optionDiv.click();
-      }
-    });
-
-    container.appendChild(optionDiv);
-  });
-
-  // Pre-select default or cached
-  if (cachedModels.has('small')) {
-    const smallOption = container.querySelector('[data-model="small"]');
-    smallOption?.classList.add('selected');
-    smallOption?.setAttribute('aria-checked', 'true');
-    currentModelVariant = 'small';
-  } else {
-    const defaultOption = container.querySelector(`[data-model="${DEFAULT_MODEL}"]`);
-    defaultOption?.classList.add('selected');
-    defaultOption?.setAttribute('aria-checked', 'true');
-  }
-
-  return container;
-}
-
-/**
- * Create action buttons (download/load).
- */
-function createLoadButtons(): { container: HTMLElement; setButtonsState: (enabled: boolean, text: string) => void } {
-  const container = document.createElement('div');
-  container.style.cssText = 'display: flex; gap: var(--spacing-md); margin-top: var(--spacing-lg);';
-
-  const loadButton = document.createElement('button');
-  loadButton.className = 'button';
-  loadButton.id = 'load-button';
-  loadButton.textContent = 'Load Model';
-  loadButton.setAttribute('aria-label', 'Load selected model');
-
-  const clearButton = document.createElement('button');
-  clearButton.className = 'button button-secondary';
-  clearButton.id = 'clear-button';
-  clearButton.textContent = 'Clear Cache';
-  clearButton.style.display = 'none';
-  clearButton.setAttribute('aria-label', 'Clear cached model');
-
-  container.appendChild(loadButton);
-  container.appendChild(clearButton);
-
-  return {
-    container,
-    setButtonsState: (enabled: boolean, text: string) => {
-      loadButton.disabled = !enabled;
-      loadButton.textContent = text;
-      clearButton.style.display = enabled ? 'none' : 'inline-block';
-    }
-  };
-}
-
-/**
  * Switch to chat UI after model loads.
  */
 async function showChatUI(): Promise<void> {
-  if (!mainContent || !statusBar || !appContainer) return;
+  if (!mainContent || !appContainer) return;
 
-  // Clear the main content
-  mainContent.innerHTML = '';
-  mainContent.className = 'chat-page';
-
-  // Re-create status bar (it was in mainContent, need to move it)
-  const newStatusBar = document.createElement('div');
-  newStatusBar.className = 'status-bar';
-  appContainer.insertBefore(newStatusBar, mainContent);
-
-  // Recreate status indicator in new status bar
-  const statusSection = document.createElement('div');
-  statusSection.className = 'status-bar-content';
-  statusSection.style.cssText = 'display: flex; align-items: center; justify-content: space-between; width: 100%;';
-  
-  createStatusIndicator(statusSection);
-  
-  // Add New Chat and settings buttons
-  const settingsContainer = document.createElement('div');
-  settingsContainer.style.cssText = 'display: flex; align-items: center; gap: var(--spacing-md);';
-  
-  // Add New Chat button
-  const newChatBtn = document.createElement('button');
-  newChatBtn.className = 'new-chat-btn';
-  newChatBtn.innerHTML = `<span>+</span> New Chat`;
-  newChatBtn.title = 'Start a new conversation';
-  newChatBtn.addEventListener('click', handleNewChat);
-  settingsContainer.appendChild(newChatBtn);
-  
-  createSettingsButton(settingsContainer);
-  statusSection.appendChild(settingsContainer);
-  
-  newStatusBar.appendChild(statusSection);
-
-  setWebGPUStatus(true);
-  setModelStatus(MODEL_INFO[currentModelVariant].name, false);
-
-  // Create chat container
-  chatMessagesContainer = createChatContainer(mainContent);
-
-  // Create input container
-  const inputContainer = document.createElement('div');
-  inputContainer.className = 'input-container-wrapper';
-  mainContent.appendChild(inputContainer);
-
-  // Create input UI
-  createMessageInput(inputContainer, handleSendMessage, handleStopGeneration);
-
-  // Create upload UI
-  uploadUI = createUploadUI(
-    chatMessagesContainer,
-    inputContainer,
-    handleFileLoaded,
-    handleFileClear
+  // Create file handlers
+  const fileHandlers = createFileHandlers(
+    {
+      getUploadedFile: () => uploadedFile,
+      setUploadedFile: (file) => { uploadedFile = file; },
+    },
+    null // Will be updated after uploadUI is created
   );
+
+  // Create chat page using extracted module
+  const elements = createChatPage(
+    mainContent,
+    appContainer,
+    currentModelVariant,
+    {
+      onNewChat: handleNewChat,
+      onSendMessage: handleSendMessage,
+      onStopGeneration: handleStopGeneration,
+      onModelSwitch: handleModelSwitch,
+      onFileLoaded: (file) => { uploadedFile = file; uploadUI?.setFileInfo(file); },
+      onFileClear: () => { uploadedFile = null; uploadUI?.clearFileInfo(); },
+      onExportText: () => exportChatAsText(messages),
+      onExportMarkdown: () => exportChatAsMarkdown(messages),
+    },
+    () => uploadedFile
+  );
+
+  // Update references
+  chatMessagesContainer = elements.chatMessagesContainer;
+  uploadUI = elements.uploadUI;
 
   // Focus input
   focusInput();
-
-  // Set up online/offline listeners
-  window.addEventListener('online', () => setOnlineStatus(true));
-  window.addEventListener('offline', () => setOnlineStatus(false));
-  setOnlineStatus(navigator.onLine);
-
-  // Handle model switch event
-  window.addEventListener('model-switch', async (e: Event) => {
-    const customEvent = e as CustomEvent<{ model: ModelVariant }>;
-    const model = customEvent.detail.model;
-    await handleModelSwitch(model);
-  });
-
-  // Set up export callback for settings panel
-  setExportCallback((format) => {
-    if (format === 'txt') {
-      exportChatAsText();
-    } else {
-      exportChatAsMarkdown();
-    }
-  });
 
   // Load chat history from IndexedDB
   await loadChatHistory();
@@ -282,68 +145,6 @@ async function handleNewChat(): Promise<void> {
   clearChat(chatMessagesContainer);
   
   console.log('[weblm] chat cleared');
-}
-
-/**
- * Export chat history as text.
- */
-function exportChatAsText(): void {
-  const lines: string[] = [];
-  lines.push('=== WebLM Chat Export ===');
-  lines.push(`Exported: ${new Date().toLocaleString()}`);
-  lines.push('');
-  
-  messages.forEach(msg => {
-    const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
-    const timestamp = new Date(msg.timestamp).toLocaleString();
-    lines.push(`[${timestamp}] ${role}:`);
-    lines.push(msg.content);
-    lines.push('');
-  });
-  
-  const content = lines.join('\n');
-  downloadFile(content, 'weblm-chat.txt', 'text/plain');
-}
-
-/**
- * Export chat history as markdown.
- */
-function exportChatAsMarkdown(): void {
-  const lines: string[] = [];
-  lines.push('# WebLM Chat Export');
-  lines.push('');
-  lines.push(`*Exported: ${new Date().toLocaleString()}*`);
-  lines.push('');
-  
-  messages.forEach(msg => {
-    const role = msg.role === 'user' ? '## User' : msg.role === 'assistant' ? '## Assistant' : '## System';
-    const timestamp = new Date(msg.timestamp).toLocaleString();
-    lines.push(role);
-    lines.push(`*${timestamp}*`);
-    lines.push('');
-    lines.push(msg.content);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  });
-  
-  const content = lines.join('\n');
-  downloadFile(content, 'weblm-chat.md', 'text/markdown');
-}
-
-/**
- * Download a file to the user's computer.
- */
-function downloadFile(content: string, filename: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 /**
@@ -710,7 +511,9 @@ async function init(): Promise<void> {
   if (largeCached) cachedModels.add('large');
 
   // Create model selector
-  const modelSelector = createModelSelectorUI(cachedModels);
+  const modelSelector = createModelSelectorUI(cachedModels, (model) => {
+    currentModelVariant = model;
+  });
   mainContent.appendChild(modelSelector);
 
   // Create progress container (hidden initially)
