@@ -74,6 +74,38 @@ export function applyTheme(theme: Theme): void {
 }
 
 /**
+ * Apply theme by name (resolving 'system' preference).
+ */
+export function applyThemeByName(themeName: 'light' | 'dark' | 'system'): void {
+  if (themeName === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(prefersDark ? darkTheme : lightTheme);
+  } else if (themeName === 'dark') {
+    applyTheme(darkTheme);
+  } else {
+    applyTheme(lightTheme);
+  }
+}
+
+/**
+ * Setup system theme change listener.
+ * Returns an unsubscribe function.
+ */
+export function watchSystemTheme(callback: () => void): () => void {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  
+  const handler = () => {
+    callback();
+  };
+  
+  mediaQuery.addEventListener('change', handler);
+  
+  return () => {
+    mediaQuery.removeEventListener('change', handler);
+  };
+}
+
+/**
  * Generate a style string for inline application.
  */
 export function createStyles(styles: Record<string, string>): string {
@@ -1128,6 +1160,106 @@ export function injectGlobalStyles(): void {
     .chat-header-title {
       font-weight: 600;
       color: var(--color-text);
+    }
+
+    /* Settings - Generation controls */
+    .setting-row {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .setting-row label {
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .setting-row input[type="range"] {
+      width: 100%;
+      margin: var(--spacing-xs) 0;
+    }
+
+    .setting-row input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      cursor: pointer;
+    }
+
+    .setting-hint {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+      font-style: italic;
+    }
+
+    /* Settings - System prompt */
+    #system-prompt-input {
+      width: 100%;
+      padding: var(--spacing-sm);
+      font-size: var(--font-size-base);
+      font-family: inherit;
+      border: 1px solid var(--color-border);
+      border-radius: var(--border-radius);
+      resize: vertical;
+      min-height: 60px;
+      background-color: var(--color-background);
+      color: var(--color-text);
+    }
+
+    #system-prompt-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    /* Settings - Theme */
+    .theme-options {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    .theme-option {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-sm);
+      border: 2px solid var(--color-border);
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .theme-option:hover {
+      border-color: var(--color-primary);
+    }
+
+    .theme-option.selected {
+      border-color: var(--color-primary);
+      background-color: var(--color-surface);
+    }
+
+    .theme-option input {
+      display: none;
+    }
+
+    .theme-label {
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+    }
+
+    /* Settings - Export */
+    .export-buttons {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    .export-buttons button {
+      flex: 1;
     }
   `;
 

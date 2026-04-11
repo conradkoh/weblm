@@ -197,12 +197,14 @@ function toWebLLMMessages(messages: ChatMessage[]): Array<{ role: 'user' | 'assi
  * @param onToken - Callback for each token received
  * @param onComplete - Callback when generation is complete
  * @param onError - Callback for errors
+ * @param options - Optional generation settings
  */
 export async function sendMessage(
   messages: ChatMessage[],
   onToken: (token: string) => void,
   onComplete: (fullResponse: string) => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  options?: { temperature?: number; maxTokens?: number; topP?: number }
 ): Promise<void> {
   if (!engine) {
     onError(new Error('Model not loaded'));
@@ -220,8 +222,9 @@ export async function sendMessage(
     const stream = await engine.chat.completions.create({
       messages: toWebLLMMessages(messages),
       stream: true,
-      temperature: DEFAULT_GENERATION_CONFIG.temperature,
-      max_tokens: DEFAULT_GENERATION_CONFIG.maxTokens,
+      temperature: options?.temperature ?? DEFAULT_GENERATION_CONFIG.temperature,
+      max_tokens: options?.maxTokens ?? DEFAULT_GENERATION_CONFIG.maxTokens,
+      top_p: options?.topP ?? DEFAULT_GENERATION_CONFIG.topP,
     });
 
     let fullResponse = '';

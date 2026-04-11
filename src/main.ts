@@ -8,14 +8,15 @@ import { checkWebGPUSupport, WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/web
 import { initializeEngine, sendMessage, stopGeneration, getIsGenerating, deleteCachedModel, getCurrentModel, unloadEngine } from './engine/index';
 import { checkModelCached, getStorageEstimate, getStorageStatus } from './storage/index';
 import { loadChatMessages, saveChatMessages, clearChatMessages } from './storage/idb';
-import { injectGlobalStyles, lightTheme, applyTheme } from './ui/styles';
+import { injectGlobalStyles, lightTheme, darkTheme, applyThemeByName, watchSystemTheme } from './ui/styles';
 import { createStatusIndicator, setWebGPUStatus, setOnlineStatus, setModelStatus, setOfflineReadyStatus } from './ui/status';
 import { createProgressBar, updateProgress, hideProgressBar, showProgressError } from './ui/progress';
 import { createChatContainer, appendMessage, appendToLastMessage, finishLastMessage, scrollToBottom, clearChat, destroyChatContainer } from './ui/chat';
 import { createMessageInput, setInputDisabled, clearInput, focusInput } from './ui/input';
 import { createUploadUI, type UploadedFile } from './ui/upload';
-import { createSettingsButton, showSettingsPanel, hideSettingsPanel, refreshSettingsPanel } from './ui/settings';
+import { createSettingsButton, showSettingsPanel, hideSettingsPanel, refreshSettingsPanel, setExportCallback } from './ui/settings';
 import { registerServiceWorker, setupOfflineDetection, onOfflineStatusChange } from './sw';
+import { loadSettings, getTemperature, getMaxTokens, getTopP, getSystemPrompt, getEffectiveTheme } from './settings';
 import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from './config';
 import type { ProgressCallback } from './engine/types';
 import type { ChatMessage } from './types';
@@ -188,6 +189,15 @@ async function showChatUI(): Promise<void> {
     await handleModelSwitch(model);
   });
 
+  // Set up export callback for settings panel
+  setExportCallback((format) => {
+    if (format === 'txt') {
+      exportChatAsText();
+    } else {
+      exportChatAsMarkdown();
+    }
+  });
+
   // Load chat history from IndexedDB
   await loadChatHistory();
 
@@ -251,6 +261,68 @@ async function handleNewChat(): Promise<void> {
   clearChat(chatMessagesContainer);
   
   console.log('[weblm] chat cleared');
+}
+
+/**
+ * Export chat history as text.
+ */
+function exportChatAsText(): void {
+  const lines: string[] = [];
+  lines.push('=== WebLM Chat Export ===');
+  lines.push(`Exported: ${new Date().toLocaleString()}`);
+  lines.push('');
+  
+  messages.forEach(msg => {
+    const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
+    const timestamp = new Date(msg.timestamp).toLocaleString();
+    lines.push(`[${timestamp}] ${role}:`);
+    lines.push(msg.content);
+    lines.push('');
+  });
+  
+  const content = lines.join('\n');
+  downloadFile(content, 'weblm-chat.txt', 'text/plain');
+}
+
+/**
+ * Export chat history as markdown.
+ */
+function exportChatAsMarkdown(): void {
+  const lines: string[] = [];
+  lines.push('# WebLM Chat Export');
+  lines.push('');
+  lines.push(`*Exported: ${new Date().toLocaleString()}*`);
+  lines.push('');
+  
+  messages.forEach(msg => {
+    const role = msg.role === 'user' ? '## User' : msg.role === 'assistant' ? '## Assistant' : '## System';
+    const timestamp = new Date(msg.timestamp).toLocaleString();
+    lines.push(role);
+    lines.push(`*${timestamp}*`);
+    lines.push('');
+    lines.push(msg.content);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  });
+  
+  const content = lines.join('\n');
+  downloadFile(content, 'weblm-chat.md', 'text/markdown');
+}
+
+/**
+ * Download a file to the user's computer.
+ */
+function downloadFile(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /**
@@ -371,6 +443,18 @@ async function handleSendMessage(userMessage: string): Promise<void> {
     // Prepare messages with file context if present
     let messagesWithContext = [...messages.slice(0, -1)]; // All messages except assistant placeholder
     
+    // Add system prompt if configured
+    const systemPrompt = getSystemPrompt();
+    if (systemPrompt && systemPrompt.trim()) {
+      const systemMessage: ChatMessage = {
+        id: generateId(),
+        role: 'system',
+        content: systemPrompt.trim(),
+        timestamp: new Date().toISOString(),
+      };
+      messagesWithContext = [systemMessage, ...messagesWithContext];
+    }
+    
     if (uploadedFile) {
       // Add file content as a system message at the beginning
       const systemMessage: ChatMessage = {
@@ -384,6 +468,11 @@ async function handleSendMessage(userMessage: string): Promise<void> {
       // Clear file after using it once (user can re-upload if needed)
       handleFileClear();
     }
+
+    // Get generation settings
+    const temperature = getTemperature();
+    const maxTokens = getMaxTokens();
+    const topP = getTopP();
 
     // Stream the response
     await sendMessage(
@@ -417,7 +506,8 @@ async function handleSendMessage(userMessage: string): Promise<void> {
         
         // Save even on error
         saveChatHistory();
-      }
+      },
+      { temperature, maxTokens, topP }
     );
   } catch (error) {
     console.error('[weblm] Send message error:', error);
@@ -522,8 +612,16 @@ async function init(): Promise<void> {
   // Inject global styles
   injectGlobalStyles();
 
-  // Apply default theme
-  applyTheme(lightTheme);
+  // Load saved settings and apply theme
+  const settings = loadSettings();
+  applyThemeByName(settings.theme);
+
+  // Watch for system theme changes if using system preference
+  if (settings.theme === 'system') {
+    watchSystemTheme(() => {
+      applyThemeByName('system');
+    });
+  }
 
   // Get the app container
   appContainer = document.getElementById('app');

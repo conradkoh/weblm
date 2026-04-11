@@ -1,17 +1,40 @@
 /**
- * Settings panel for model management.
+ * Settings panel for model management and user preferences.
  *
  * Responsibilities:
  * - Model selector UI
  * - Storage usage display
  * - Memory recommendations
  * - Model clearing/switching
+ * - Generation settings (temperature, max tokens, top_p)
+ * - System prompt configuration
+ * - Theme toggle (light/dark/system)
+ * - Chat export (text/markdown)
  */
 
-import { MODEL_INFO, type ModelVariant } from '../config';
+import { MODEL_INFO, DEFAULT_GENERATION_CONFIG, type ModelVariant } from '../config';
 import { checkModelCached, clearCachedModel, getStorageEstimate } from '../storage/index';
 import { getCurrentModel, unloadEngine, getIsGenerating } from '../engine/index';
 import type { ModelVariant as EngineModelVariant } from '../engine/types';
+import {
+  loadSettings,
+  saveSettings,
+  resetSettings,
+  getTemperature,
+  setTemperature,
+  getMaxTokens,
+  setMaxTokens,
+  getTopP,
+  setTopP,
+  getSystemPrompt,
+  setSystemPrompt,
+  getTheme,
+  setTheme,
+  type Theme,
+  type AppSettings,
+} from '../settings';
+import { lightTheme, darkTheme, applyThemeByName, watchSystemTheme } from './styles';
+import type { ChatMessage } from '../types';
 
 /** Aliases for clarity */
 const isModelCached = checkModelCached;
@@ -21,9 +44,24 @@ const deleteCachedModel = clearCachedModel;
 let settingsPanel: HTMLElement | null = null;
 let settingsOverlay: HTMLElement | null = null;
 
+/** System theme watcher unsubscribe */
+let systemThemeUnsubscribe: (() => void) | null = null;
+
 /** Callback types */
 export type ModelChangeCallback = (model: ModelVariant) => Promise<void>;
 export type ModelClearCallback = (model: ModelVariant) => Promise<void>;
+export type SettingsChangeCallback = (settings: AppSettings) => void;
+export type ExportCallback = (format: 'txt' | 'md') => void;
+
+/** Chat export callback */
+let exportCallback: ExportCallback | null = null;
+
+/**
+ * Set the export callback for chat history.
+ */
+export function setExportCallback(callback: ExportCallback): void {
+  exportCallback = callback;
+}
 
 /**
  * Create the settings panel UI.
@@ -32,7 +70,7 @@ export function createSettingsButton(container: HTMLElement): HTMLElement {
   const button = document.createElement('button');
   button.className = 'settings-button';
   button.innerHTML = '⚙️';
-  button.title = 'Model Settings';
+  button.title = 'Settings';
   button.addEventListener('click', () => {
     showSettingsPanel();
   });
@@ -49,19 +87,38 @@ export async function showSettingsPanel(): Promise<void> {
     return;
   }
 
+  // Load current settings
+  const settings = loadSettings();
+
   // Create overlay
   settingsOverlay = document.createElement('div');
   settingsOverlay.className = 'settings-overlay';
   settingsOverlay.innerHTML = `
     <div class="settings-panel">
       <div class="settings-header">
-        <h2>Model Settings</h2>
+        <h2>Settings</h2>
         <button class="settings-close" id="settings-close">✕</button>
       </div>
       <div class="settings-content">
         <div class="settings-section">
           <h3>Available Models</h3>
           <div id="model-list"></div>
+        </div>
+        <div class="settings-section">
+          <h3>Generation</h3>
+          <div id="generation-settings"></div>
+        </div>
+        <div class="settings-section">
+          <h3>System Prompt</h3>
+          <div id="system-prompt-settings"></div>
+        </div>
+        <div class="settings-section">
+          <h3>Appearance</h3>
+          <div id="theme-settings"></div>
+        </div>
+        <div class="settings-section">
+          <h3>Export Chat</h3>
+          <div id="export-settings"></div>
         </div>
         <div class="settings-section">
           <h3>Storage</h3>
@@ -97,6 +154,18 @@ export async function showSettingsPanel(): Promise<void> {
 
   // Populate model list
   await populateModelList();
+
+  // Populate generation settings
+  populateGenerationSettings(settings);
+
+  // Populate system prompt
+  populateSystemPrompt(settings);
+
+  // Populate theme settings
+  populateThemeSettings(settings);
+
+  // Populate export options
+  populateExportOptions();
 
   // Update storage info
   await updateStorageInfo();
@@ -271,4 +340,167 @@ export async function refreshSettingsPanel(): Promise<void> {
     await updateStorageInfo();
     updateMemoryInfo();
   }
+}
+
+/**
+ * Populate generation settings section.
+ */
+function populateGenerationSettings(settings: AppSettings): void {
+  const container = document.getElementById('generation-settings');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="setting-row">
+      <label for="temperature-slider">Temperature: <span id="temperature-value">${settings.temperature.toFixed(1)}</span></label>
+      <input type="range" id="temperature-slider" min="0" max="2" step="0.1" value="${settings.temperature}">
+      <span class="setting-hint">Higher = more creative, Lower = more deterministic</span>
+    </div>
+    <div class="setting-row">
+      <label for="max-tokens-slider">Max Tokens: <span id="max-tokens-value">${settings.maxTokens}</span></label>
+      <input type="range" id="max-tokens-slider" min="16" max="4096" step="16" value="${settings.maxTokens}">
+      <span class="setting-hint">Maximum response length</span>
+    </div>
+    <div class="setting-row">
+      <label for="top-p-slider">Top P: <span id="top-p-value">${settings.topP.toFixed(2)}</span></label>
+      <input type="range" id="top-p-slider" min="0" max="1" step="0.05" value="${settings.topP}">
+      <span class="setting-hint">Nucleus sampling threshold</span>
+    </div>
+    <div class="setting-row">
+      <button class="button button-secondary" id="reset-generation-btn">Reset to Defaults</button>
+    </div>
+  `;
+
+  // Temperature slider
+  const tempSlider = document.getElementById('temperature-slider') as HTMLInputElement;
+  const tempValue = document.getElementById('temperature-value');
+  tempSlider?.addEventListener('input', () => {
+    const value = parseFloat(tempSlider.value);
+    if (tempValue) tempValue.textContent = value.toFixed(1);
+    setTemperature(value);
+  });
+
+  // Max tokens slider
+  const maxTokensSlider = document.getElementById('max-tokens-slider') as HTMLInputElement;
+  const maxTokensValue = document.getElementById('max-tokens-value');
+  maxTokensSlider?.addEventListener('input', () => {
+    const value = parseInt(maxTokensSlider.value);
+    if (maxTokensValue) maxTokensValue.textContent = String(value);
+    setMaxTokens(value);
+  });
+
+  // Top P slider
+  const topPSlider = document.getElementById('top-p-slider') as HTMLInputElement;
+  const topPValue = document.getElementById('top-p-value');
+  topPSlider?.addEventListener('input', () => {
+    const value = parseFloat(topPSlider.value);
+    if (topPValue) topPValue.textContent = value.toFixed(2);
+    setTopP(value);
+  });
+
+  // Reset button
+  const resetBtn = document.getElementById('reset-generation-btn');
+  resetBtn?.addEventListener('click', () => {
+    setTemperature(DEFAULT_GENERATION_CONFIG.temperature);
+    setMaxTokens(DEFAULT_GENERATION_CONFIG.maxTokens);
+    setTopP(DEFAULT_GENERATION_CONFIG.topP);
+    // Repopulate to update UI
+    const newSettings = loadSettings();
+    populateGenerationSettings(newSettings);
+  });
+}
+
+/**
+ * Populate system prompt section.
+ */
+function populateSystemPrompt(settings: AppSettings): void {
+  const container = document.getElementById('system-prompt-settings');
+  if (!container) return;
+
+  container.innerHTML = `
+    <textarea id="system-prompt-input" rows="3" placeholder="Enter a system prompt...">${settings.systemPrompt}</textarea>
+    <span class="setting-hint">System prompt is prepended to all conversations.</span>
+  `;
+
+  const textarea = document.getElementById('system-prompt-input') as HTMLTextAreaElement;
+  textarea?.addEventListener('change', () => {
+    setSystemPrompt(textarea.value);
+  });
+
+  // Auto-resize textarea
+  textarea?.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  });
+}
+
+/**
+ * Populate theme settings section.
+ */
+function populateThemeSettings(settings: AppSettings): void {
+  const container = document.getElementById('theme-settings');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="theme-options">
+      <label class="theme-option ${settings.theme === 'light' ? 'selected' : ''}">
+        <input type="radio" name="theme" value="light" ${settings.theme === 'light' ? 'checked' : ''}>
+        <span class="theme-label">☀️ Light</span>
+      </label>
+      <label class="theme-option ${settings.theme === 'dark' ? 'selected' : ''}">
+        <input type="radio" name="theme" value="dark" ${settings.theme === 'dark' ? 'checked' : ''}>
+        <span class="theme-label">🌙 Dark</span>
+      </label>
+      <label class="theme-option ${settings.theme === 'system' ? 'selected' : ''}">
+        <input type="radio" name="theme" value="system" ${settings.theme === 'system' ? 'checked' : ''}>
+        <span class="theme-label">💻 System</span>
+      </label>
+    </div>
+  `;
+
+  // Theme change handlers
+  container.querySelectorAll('input[name="theme"]').forEach((input) => {
+    input.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      const newTheme = target.value as Theme;
+      setTheme(newTheme);
+      applyThemeByName(newTheme);
+      
+      // Update selected class
+      container.querySelectorAll('.theme-option').forEach((opt) => {
+        opt.classList.remove('selected');
+      });
+      target.closest('.theme-option')?.classList.add('selected');
+    });
+  });
+}
+
+/**
+ * Populate export options section.
+ */
+function populateExportOptions(): void {
+  const container = document.getElementById('export-settings');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="export-buttons">
+      <button class="button button-secondary" id="export-txt-btn">Export as Text (.txt)</button>
+      <button class="button button-secondary" id="export-md-btn">Export as Markdown (.md)</button>
+    </div>
+    <span class="setting-hint">Download current chat history as a file.</span>
+  `;
+
+  const exportTxtBtn = document.getElementById('export-txt-btn');
+  const exportMdBtn = document.getElementById('export-md-btn');
+
+  exportTxtBtn?.addEventListener('click', () => {
+    if (exportCallback) {
+      exportCallback('txt');
+    }
+  });
+
+  exportMdBtn?.addEventListener('click', () => {
+    if (exportCallback) {
+      exportCallback('md');
+    }
+  });
 }

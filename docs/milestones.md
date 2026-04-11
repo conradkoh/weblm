@@ -219,21 +219,21 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.8.0 — Settings & Customization
+### 0.8.0 — Settings & Customization ✅
 *Codename: "Preferences"*
 
 **Summary:** Allow users to customize behavior and appearance.
 
 **Requirements:**
-- [ ] Temperature slider (0.0 – 2.0, default 0.7)
-- [ ] Max tokens slider (16 – 4096, default 2048)
-- [ ] Top-p sampling control (0.0 – 1.0, default 0.95)
-- [ ] System prompt textarea for custom instructions
-- [ ] Theme toggle: light / dark / system
-- [ ] Export chat as plain text (`.txt`)
-- [ ] Export chat as Markdown (`.md`)
-- [ ] Reset all settings to defaults
-- [ ] Settings persist in IndexedDB
+- [x] Temperature slider (0.0 – 2.0, default 0.7)
+- [x] Max tokens slider (16 – 4096, default 2048)
+- [x] Top-p sampling control (0.0 – 1.0, default 0.95)
+- [x] System prompt textarea for custom instructions
+- [x] Theme toggle: light / dark / system
+- [x] Export chat as plain text (`.txt`)
+- [x] Export chat as Markdown (`.md`)
+- [x] Reset all settings to defaults
+- [x] Settings persist in localStorage
 
 **Acceptance Criteria:**
 - Temperature changes affect generation creativity
@@ -244,6 +244,10 @@ These are the top user priorities that must be addressed prominently:
 - Settings persist across browser sessions
 
 **Dependencies:** 0.3.0 — requires chat infrastructure
+
+**Note:** Settings are stored in localStorage (small key-value pairs) rather than IndexedDB for simplicity.
+
+**✅ Completed: 2026-04-11 UTC**
 
 ---
 
