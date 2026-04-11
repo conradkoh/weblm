@@ -187,21 +187,21 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.7.0 — Offline & PWA
+### 0.7.0 — Offline & PWA ✅
 *Codename: "Standalone"*
 
 **Summary:** Enable full offline capability and installable PWA experience.
 
 **Requirements:**
-- [ ] Service worker for offline page serving
-- [ ] "Offline Ready" indicator when all assets cached
-- [ ] PWA manifest for home screen installation
-- [ ] Install prompt for desktop/mobile
-- [ ] Graceful degradation when WebGPU unavailable:
+- [x] Service worker for offline page serving
+- [x] "Offline Ready" indicator when all assets cached
+- [x] PWA manifest for home screen installation
+- [ ] Install prompt for desktop/mobile — deferred (native PWA install prompts)
+- [x] Graceful degradation when WebGPU unavailable:
   - Show clear error explaining browser limitations
   - Provide fallback suggestions (different browser, check GPU)
-- [ ] Offline notification when user loses connection
-- [ ] Background sync for any pending state
+- [x] Offline notification when user loses connection
+- [ ] Background sync for any pending state — deferred (not critical for 1.0)
 
 **Acceptance Criteria:**
 - After first load, app works 100% offline
@@ -212,6 +212,10 @@ These are the top user priorities that must be addressed prominently:
 - No network requests after initial model download
 
 **Dependencies:** 0.2.0 — requires model caching
+
+**Note:** Native install prompts deferred as browsers handle this automatically for PWAs. Background sync deferred as it's not critical for 1.0.
+
+**✅ Completed: 2026-04-11 UTC**
 
 ---
 

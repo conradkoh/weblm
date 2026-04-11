@@ -152,3 +152,39 @@ export function setStatusBadge(type: StatusType, message: string): void {
     <span>${message}</span>
   `;
 }
+
+/**
+ * Set the offline-ready status.
+ * Shows when service worker is active and app can work offline.
+ */
+export function setOfflineReadyStatus(ready: boolean): void {
+  // Find or create the offline-ready indicator
+  let indicator = document.getElementById('offline-ready-status');
+  
+  if (!ready) {
+    if (indicator) {
+      indicator.style.display = 'none';
+    }
+    return;
+  }
+
+  if (!indicator) {
+    // Create new indicator
+    indicator = document.createElement('div');
+    indicator.className = 'status-indicator';
+    indicator.id = 'offline-ready-status';
+    indicator.innerHTML = `
+      <span class="status-dot success"></span>
+      <span>Offline Ready ✓</span>
+    `;
+    indicator.title = 'App is cached and can work offline';
+    
+    // Add after online status
+    const onlineStatus = document.getElementById('online-status');
+    if (onlineStatus && onlineStatus.parentElement) {
+      onlineStatus.parentElement.insertBefore(indicator, onlineStatus.nextSibling);
+    }
+  } else {
+    indicator.style.display = 'flex';
+  }
+}

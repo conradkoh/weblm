@@ -1,0 +1,23 @@
+{
+  "name": "WebLM — Local AI Chat",
+  "short_name": "WebLM",
+  "description": "A fully local, privacy-first AI chat running entirely in your browser using Gemma 4.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": [],
+  "prefer_related_applications": false,
+  "related_applications": []
+}

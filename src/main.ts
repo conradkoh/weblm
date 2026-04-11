@@ -9,12 +9,13 @@ import { initializeEngine, sendMessage, stopGeneration, getIsGenerating, deleteC
 import { checkModelCached, getStorageEstimate, getStorageStatus } from './storage/index';
 import { loadChatMessages, saveChatMessages, clearChatMessages } from './storage/idb';
 import { injectGlobalStyles, lightTheme, applyTheme } from './ui/styles';
-import { createStatusIndicator, setWebGPUStatus, setOnlineStatus, setModelStatus } from './ui/status';
+import { createStatusIndicator, setWebGPUStatus, setOnlineStatus, setModelStatus, setOfflineReadyStatus } from './ui/status';
 import { createProgressBar, updateProgress, hideProgressBar, showProgressError } from './ui/progress';
 import { createChatContainer, appendMessage, appendToLastMessage, finishLastMessage, scrollToBottom, clearChat, destroyChatContainer } from './ui/chat';
 import { createMessageInput, setInputDisabled, clearInput, focusInput } from './ui/input';
 import { createUploadUI, type UploadedFile } from './ui/upload';
 import { createSettingsButton, showSettingsPanel, hideSettingsPanel, refreshSettingsPanel } from './ui/settings';
+import { registerServiceWorker, setupOfflineDetection, onOfflineStatusChange } from './sw';
 import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from './config';
 import type { ProgressCallback } from './engine/types';
 import type { ChatMessage } from './types';
@@ -625,6 +626,18 @@ async function init(): Promise<void> {
   window.addEventListener('online', () => setOnlineStatus(true));
   window.addEventListener('offline', () => setOnlineStatus(false));
   setOnlineStatus(navigator.onLine);
+
+  // Register service worker for offline capability
+  registerServiceWorker().then(() => {
+    // Set up offline detection and update status
+    setupOfflineDetection();
+    onOfflineStatusChange((isOffline, isReady) => {
+      setOnlineStatus(!isOffline);
+      if (isReady) {
+        setOfflineReadyStatus(true);
+      }
+    });
+  });
 
   console.log('[weblm] initialization complete');
 }
