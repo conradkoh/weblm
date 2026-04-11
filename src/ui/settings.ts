@@ -30,6 +30,8 @@ import {
   setSystemPrompt,
   getTheme,
   setTheme,
+  getShowMetrics,
+  setShowMetrics,
   type Theme,
   type AppSettings,
 } from '../settings';
@@ -117,6 +119,10 @@ export async function showSettingsPanel(): Promise<void> {
           <div id="theme-settings"></div>
         </div>
         <div class="settings-section">
+          <h3>Performance</h3>
+          <div id="performance-settings"></div>
+        </div>
+        <div class="settings-section">
           <h3>Export Chat</h3>
           <div id="export-settings"></div>
         </div>
@@ -163,6 +169,9 @@ export async function showSettingsPanel(): Promise<void> {
 
   // Populate theme settings
   populateThemeSettings(settings);
+
+  // Populate performance settings
+  populatePerformanceSettings(settings);
 
   // Populate export options
   populateExportOptions();
@@ -502,5 +511,28 @@ function populateExportOptions(): void {
     if (exportCallback) {
       exportCallback('md');
     }
+  });
+}
+
+/**
+ * Populate performance settings section.
+ */
+function populatePerformanceSettings(settings: AppSettings): void {
+  const container = document.getElementById('performance-settings');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="setting-row">
+      <label class="checkbox-label">
+        <input type="checkbox" id="show-metrics-checkbox" ${settings.showMetrics ? 'checked' : ''}>
+        <span>Show performance metrics</span>
+      </label>
+      <span class="setting-hint">Display TTFT, tokens/sec, and generation time below each response.</span>
+    </div>
+  `;
+
+  const checkbox = document.getElementById('show-metrics-checkbox') as HTMLInputElement;
+  checkbox?.addEventListener('change', () => {
+    setShowMetrics(checkbox.checked);
   });
 }

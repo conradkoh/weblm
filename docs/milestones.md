@@ -251,20 +251,20 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.9.0 — Performance & Reliability
+### 0.9.0 — Performance & Reliability ✅
 *Codename: "Hardened"*
 
 **Summary:** Optimize performance and handle edge cases robustly.
 
 **Requirements:**
-- [ ] TTFT < 500ms on subsequent loads (with cached model)
-- [ ] Token throughput > 20 t/s on integrated GPUs (Apple M-series, Intel Iris Xe)
-- [ ] Memory leak prevention (stable heap across long sessions)
-- [ ] Error recovery from model crash (auto-restart with message)
-- [ ] OOM handling with clear user guidance
-- [ ] Loading state management (no flash of unstyled content)
-- [ ] Responsive generation (UI doesn't freeze during inference)
-- [ ] Performance metrics display (optional debug mode)
+- [x] TTFT < 500ms on subsequent loads (with cached model)
+- [x] Token throughput > 20 t/s on integrated GPUs (Apple M-series, Intel Iris Xe)
+- [x] Memory leak prevention (stable heap across long sessions)
+- [x] Error recovery from model crash (auto-restart with message)
+- [x] OOM handling with clear user guidance
+- [x] Loading state management (no flash of unstyled content)
+- [x] Responsive generation (UI doesn't freeze during inference)
+- [x] Performance metrics display (optional debug mode)
 
 **Acceptance Criteria:**
 - Measured TTFT under 500ms on MacBook Air M1 with cached E2B
@@ -276,6 +276,10 @@ These are the top user priorities that must be addressed prominently:
 - UI remains responsive during stream generation
 
 **Dependencies:** 0.3.0 — requires chat streaming
+
+**Note:** Performance metrics are opt-in via settings. Error recovery includes categorization (OOM, device lost, network) with appropriate user guidance. Memory warnings use navigator.deviceMemory where available.
+
+**✅ Completed: 2026-04-11 UTC**
 
 ---
 

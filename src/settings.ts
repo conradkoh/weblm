@@ -17,6 +17,7 @@ const STORAGE_KEYS = {
   topP: 'weblm-top-p',
   systemPrompt: 'weblm-system-prompt',
   theme: 'weblm-theme',
+  showMetrics: 'weblm-show-metrics',
 } as const;
 
 /** Theme type */
@@ -29,6 +30,7 @@ export interface AppSettings {
   topP: number;
   systemPrompt: string;
   theme: Theme;
+  showMetrics: boolean;
 }
 
 /** Default settings */
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   topP: DEFAULT_GENERATION_CONFIG.topP,
   systemPrompt: 'You are a helpful AI assistant.',
   theme: 'system',
+  showMetrics: false,
 };
 
 /**
@@ -74,6 +77,7 @@ export function loadSettings(): AppSettings {
     topP: getSetting(STORAGE_KEYS.topP, DEFAULT_SETTINGS.topP, parseFloat),
     systemPrompt: getSetting(STORAGE_KEYS.systemPrompt, DEFAULT_SETTINGS.systemPrompt, String),
     theme: getSetting(STORAGE_KEYS.theme, DEFAULT_SETTINGS.theme, String as (val: string) => Theme),
+    showMetrics: getSetting(STORAGE_KEYS.showMetrics, DEFAULT_SETTINGS.showMetrics, (val) => val === 'true'),
   };
 }
 
@@ -95,6 +99,9 @@ export function saveSettings(settings: Partial<AppSettings>): void {
   }
   if (settings.theme !== undefined) {
     setSetting(STORAGE_KEYS.theme, settings.theme);
+  }
+  if (settings.showMetrics !== undefined) {
+    setSetting(STORAGE_KEYS.showMetrics, settings.showMetrics);
   }
 }
 
@@ -184,4 +191,18 @@ export function getEffectiveTheme(): 'light' | 'dark' {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   return theme;
+}
+
+/**
+ * Get show metrics setting.
+ */
+export function getShowMetrics(): boolean {
+  return getSetting(STORAGE_KEYS.showMetrics, DEFAULT_SETTINGS.showMetrics, (val) => val === 'true');
+}
+
+/**
+ * Set show metrics setting.
+ */
+export function setShowMetrics(value: boolean): void {
+  setSetting(STORAGE_KEYS.showMetrics, value);
 }

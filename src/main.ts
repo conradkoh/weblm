@@ -6,6 +6,7 @@
 
 import { checkWebGPUSupport, WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
 import { initializeEngine, sendMessage, stopGeneration, getIsGenerating, deleteCachedModel, getCurrentModel, unloadEngine } from './engine/index';
+import { categorizeError, trackError, getErrorMessage, getRecoveryAction, getMemoryWarning, clearErrorHistory } from './engine/error-recovery';
 import { checkModelCached, getStorageEstimate, getStorageStatus } from './storage/index';
 import { loadChatMessages, saveChatMessages, clearChatMessages } from './storage/idb';
 import { injectGlobalStyles, lightTheme, darkTheme, applyThemeByName, watchSystemTheme } from './ui/styles';
@@ -16,7 +17,8 @@ import { createMessageInput, setInputDisabled, clearInput, focusInput } from './
 import { createUploadUI, type UploadedFile } from './ui/upload';
 import { createSettingsButton, showSettingsPanel, hideSettingsPanel, refreshSettingsPanel, setExportCallback } from './ui/settings';
 import { registerServiceWorker, setupOfflineDetection, onOfflineStatusChange } from './sw';
-import { loadSettings, getTemperature, getMaxTokens, getTopP, getSystemPrompt, getEffectiveTheme } from './settings';
+import { loadSettings, getTemperature, getMaxTokens, getTopP, getSystemPrompt, getEffectiveTheme, getShowMetrics, setShowMetrics } from './settings';
+import { startGeneration, recordFirstToken, incrementTokenCount, completeGeneration, createMetricsElement, isMetricsEnabled, loadMetricsPreference } from './ui/metrics';
 import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from './config';
 import type { ProgressCallback } from './engine/types';
 import type { ChatMessage } from './types';
@@ -615,6 +617,9 @@ async function init(): Promise<void> {
   // Load saved settings and apply theme
   const settings = loadSettings();
   applyThemeByName(settings.theme);
+
+  // Load metrics preference
+  loadMetricsPreference();
 
   // Watch for system theme changes if using system preference
   if (settings.theme === 'system') {

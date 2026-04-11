@@ -1261,6 +1261,55 @@ export function injectGlobalStyles(): void {
     .export-buttons button {
       flex: 1;
     }
+
+    /* Settings - Checkbox */
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    /* Message metrics */
+    .message-metrics {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-xs);
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      opacity: 0.7;
+    }
+
+    .message-metrics .metric {
+      padding: 2px 6px;
+      background-color: var(--color-surface);
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+    }
+
+    /* Loading spinner */
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
   `;
 
   document.head.appendChild(styleElement);
