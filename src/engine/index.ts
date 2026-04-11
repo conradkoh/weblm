@@ -1,25 +1,21 @@
 /**
- * Engine module — WebLLM integration and model lifecycle management.
+ * Engine module — public API for model lifecycle and chat.
  *
- * Responsibilities:
- * - Model loading / initialization via WebLLM
- * - Progress reporting during model download
- * - Engine instance management
- * - Chat completions with streaming
- * - Memory-aware model selection
+ * All inference is delegated to the singleton LLMEngine from engine-factory.
+ * Callers do not need to know which runtime is active.
+ *
+ * Standalone utilities (WebLLM-specific cache helpers) are also re-exported here.
  */
 
-import { CreateMLCEngine, prebuiltAppConfig, type MLCEngine, type InitProgressReport } from '@mlc-ai/web-llm';
-import { getModelInfo, DEFAULT_GENERATION_CONFIG, GEMMA3_MODEL_RECORDS } from '../config';
-import type { ModelProgress, ProgressCallback } from './types';
+import { prebuiltAppConfig, type MLCEngine, type InitProgressReport } from '@mlc-ai/web-llm';
+import { getModelInfo } from '../config';
+import { getEngineInstance } from './engine-factory';
+import { WebLLMAdapter } from './webllm-adapter';
+import type { ProgressCallback } from './types';
 import type { ChatMessage } from '../types';
 import { logger } from '../logger';
 
-// Module-level state
-let engine: MLCEngine | null = null;
-let currentModelId: string | null = null;
-let loadingController: AbortController | null = null;
-let isGenerating = false;
+// ─── Cache utilities (WebLLM-specific, not part of LLMEngine) ─
 
 /**
  * Check if a model is already cached in IndexedDB.
@@ -49,114 +45,10 @@ export async function getStorageEstimate(): Promise<{ quota: number; usage: numb
  */
 export async function hasEnoughStorage(modelId: string): Promise<boolean> {
   const info = getModelInfo(modelId);
-  if (!info) return true; // Unknown model — optimistically allow
+  if (!info) return true;
   const { quota, usage } = await getStorageEstimate();
   const availableSpace = quota - usage;
-  // Need at least 1.5× the VRAM estimate as a proxy for download size
   return availableSpace > info.vramMB * 1.5 * 1024 * 1024;
-}
-
-/**
- * Initialize the WebLLM engine with a specific model.
- *
- * Downloads the model if not cached, then initializes the engine.
- * Progress is reported via the callback.
- */
-export async function initializeEngine(
-  modelId: string,
-  onProgress?: ProgressCallback
-): Promise<void> {
-  const info = getModelInfo(modelId);
-  const displayName = info?.displayName ?? modelId;
-
-  loadingController = new AbortController();
-  const { signal } = loadingController;
-
-  try {
-    engine = await CreateMLCEngine(modelId, {
-      appConfig: {
-        // Merge prebuilt list with Gemma 3 custom records
-        model_list: [...prebuiltAppConfig.model_list, ...GEMMA3_MODEL_RECORDS],
-      },
-      initProgressCallback: (report: InitProgressReport) => {
-        if (signal.aborted) {
-          throw new Error('Loading cancelled');
-        }
-
-        const progress: ModelProgress = {
-          phase: report.text?.toLowerCase().includes('download')
-            ? 'downloading'
-            : report.text?.toLowerCase().includes('compil')
-              ? 'compiling'
-              : 'loading',
-          progress: Math.round(report.progress * 100),
-          message: report.text || `Loading ${displayName}...`,
-          timeElapsed: report.timeElapsed,
-        };
-
-        onProgress?.(progress);
-      },
-    });
-
-    currentModelId = modelId;
-
-    onProgress?.({
-      phase: 'ready',
-      progress: 100,
-      message: `${displayName} loaded successfully!`,
-    });
-
-  } catch (error) {
-    engine = null;
-    currentModelId = null;
-    throw error;
-  } finally {
-    loadingController = null;
-  }
-}
-
-/**
- * Cancel the ongoing model loading.
- */
-export function cancelLoading(): void {
-  if (loadingController) {
-    loadingController.abort();
-    loadingController = null;
-  }
-}
-
-/** Get the current engine instance. */
-export function getEngine(): MLCEngine | null {
-  return engine;
-}
-
-/** Check if a model is currently loaded. */
-export function isModelLoaded(): boolean {
-  return engine !== null;
-}
-
-/** Get the currently loaded model ID. */
-export function getCurrentModel(): string | null {
-  return currentModelId;
-}
-
-/** Check if the engine is currently generating. */
-export function getIsGenerating(): boolean {
-  return isGenerating;
-}
-
-/**
- * Unload the engine and free memory.
- */
-export async function unloadEngine(): Promise<void> {
-  if (engine) {
-    try {
-      engine = null;
-      currentModelId = null;
-    } catch (error) {
-      logger.error('Error unloading engine:', error);
-    }
-  }
 }
 
 /**
@@ -167,17 +59,66 @@ export async function deleteCachedModel(modelId: string): Promise<void> {
   await deleteModelAllInfoInCache(modelId);
 }
 
+// ─── Engine lifecycle delegates ──────────────────────────────
+
 /**
- * Convert our chat messages to WebLLM/OpenAI format.
+ * Initialize the engine with a specific model.
  */
-function toWebLLMMessages(messages: ChatMessage[]): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
-  return messages
-    .filter(m => m.role === 'user' || m.role === 'assistant' || m.role === 'system')
-    .map(m => ({
-      role: m.role as 'user' | 'assistant' | 'system',
-      content: m.content,
-    }));
+export async function initializeEngine(
+  modelId: string,
+  onProgress?: ProgressCallback
+): Promise<void> {
+  return getEngineInstance().initialize(modelId, onProgress);
 }
+
+/**
+ * Cancel the ongoing model loading (WebLLMAdapter-specific).
+ */
+export function cancelLoading(): void {
+  const eng = getEngineInstance();
+  if (eng instanceof WebLLMAdapter) {
+    eng.cancelLoading();
+  }
+}
+
+/**
+ * Get the raw MLCEngine instance (WebLLMAdapter-specific, used by callers that need it).
+ */
+export function getEngine(): MLCEngine | null {
+  // Kept for backward compatibility — callers that typed against MLCEngine directly.
+  // Returns null when a non-WebLLM adapter is active.
+  return null;
+}
+
+/**
+ * Check if a model is currently loaded.
+ */
+export function isModelLoaded(): boolean {
+  return getEngineInstance().isModelLoaded();
+}
+
+/**
+ * Get the currently loaded model ID.
+ */
+export function getCurrentModel(): string | null {
+  return getEngineInstance().getCurrentModelId();
+}
+
+/**
+ * Check if the engine is currently generating.
+ */
+export function getIsGenerating(): boolean {
+  return getEngineInstance().isGenerating();
+}
+
+/**
+ * Unload the engine and free memory.
+ */
+export async function unloadEngine(): Promise<void> {
+  return getEngineInstance().unload();
+}
+
+// ─── Chat ─────────────────────────────────────────────────────
 
 /**
  * Send a message to the model and stream the response.
@@ -189,59 +130,14 @@ export async function sendMessage(
   onError: (error: Error) => void,
   options?: { temperature?: number; maxTokens?: number; topP?: number }
 ): Promise<void> {
-  if (!engine) {
-    onError(new Error('Model not loaded'));
-    return;
-  }
-
-  if (isGenerating) {
-    onError(new Error('Already generating'));
-    return;
-  }
-
-  isGenerating = true;
-
-  try {
-    const stream = await engine.chat.completions.create({
-      messages: toWebLLMMessages(messages),
-      stream: true,
-      temperature: options?.temperature ?? DEFAULT_GENERATION_CONFIG.temperature,
-      max_tokens: options?.maxTokens ?? DEFAULT_GENERATION_CONFIG.maxTokens,
-      top_p: options?.topP ?? DEFAULT_GENERATION_CONFIG.topP,
-    });
-
-    let fullResponse = '';
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content || '';
-      if (delta) {
-        fullResponse += delta;
-        onToken(delta);
-      }
-    }
-
-    onComplete(fullResponse);
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    logger.error('Generation error:', err);
-    onError(err);
-  } finally {
-    isGenerating = false;
-  }
+  return getEngineInstance().sendMessage(messages, onToken, onComplete, onError, options);
 }
 
 /**
  * Stop the current generation.
  */
 export function stopGeneration(): void {
-  if (engine && isGenerating) {
-    try {
-      engine.interruptGenerate();
-    } catch (error) {
-      logger.error('Error stopping generation:', error);
-    }
-    isGenerating = false;
-  }
+  getEngineInstance().stopGeneration();
 }
 
 export type { MLCEngine, InitProgressReport };
