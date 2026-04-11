@@ -16,17 +16,17 @@ These are the top user priorities that must be addressed prominently:
 
 ## Milestones
 
-### 0.1.0 — Foundation
+### 0.1.0 — Foundation ✅
 *Codename: "Groundwork"*
 
 **Summary:** Establish the minimal infrastructure for local development with proper browser headers and basic rendering.
 
 **Requirements:**
-- [ ] WebGPU capability detection with clear user messaging when unsupported
-- [ ] Development server with COOP/COEP headers configured (required for `SharedArrayBuffer`)
-- [ ] Basic HTML shell renders successfully in supported browsers
-- [ ] TypeScript compilation and type checking passes with zero errors
-- [ ] Build produces a single distributable HTML file
+- [x] WebGPU capability detection with clear user messaging when unsupported
+- [x] Development server with COOP/COEP headers configured (required for `SharedArrayBuffer`)
+- [x] Basic HTML shell renders successfully in supported browsers
+- [x] TypeScript compilation and type checking passes with zero errors
+- [x] Build produces a single distributable HTML file
 
 **Acceptance Criteria:**
 - Visiting the dev server URL shows a page with "WebGPU Available" or "WebGPU Not Available" message
@@ -35,6 +35,8 @@ These are the top user priorities that must be addressed prominently:
 - Unsupported browsers see a clear explanation message
 
 **Dependencies:** None — this is the starting point.
+
+**✅ Completed: 2025-04-11 UTC**
 
 ---
 
