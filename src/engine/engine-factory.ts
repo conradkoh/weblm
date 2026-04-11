@@ -8,6 +8,7 @@
 
 import type { LLMEngine } from './llm-engine';
 import { WebLLMAdapter } from './webllm-adapter';
+import { TransformersJsAdapter } from './transformers-adapter';
 
 export type Runtime = 'webllm' | 'transformers.js';
 
@@ -19,7 +20,7 @@ export function createEngine(runtime: Runtime): LLMEngine {
     case 'webllm':
       return new WebLLMAdapter();
     case 'transformers.js':
-      throw new Error('Transformers.js runtime not yet implemented (coming in Phase 2)');
+      return new TransformersJsAdapter();
     default: {
       const _exhaustive: never = runtime;
       throw new Error(`Unknown runtime: ${_exhaustive}`);
