@@ -30,18 +30,23 @@ export function createProgressBar(container: HTMLElement): void {
   // Create progress bar container
   progressContainer = document.createElement('div');
   progressContainer.className = 'progress-container';
+  progressContainer.setAttribute('role', 'progressbar');
+  progressContainer.setAttribute('aria-label', 'Model download progress');
+  progressContainer.setAttribute('aria-valuemin', '0');
+  progressContainer.setAttribute('aria-valuemax', '100');
+  progressContainer.setAttribute('aria-valuenow', '0');
   progressContainer.innerHTML = `
     <div class="progress-info">
       <span class="progress-phase" id="progress-phase">Initializing...</span>
       <span class="progress-percent" id="progress-text">0%</span>
     </div>
     <div class="progress-bar-outer">
-      <div class="progress-bar-inner" id="progress-bar-inner"></div>
+      <div class="progress-bar-inner" id="progress-bar-inner" aria-hidden="true"></div>
     </div>
     <div class="progress-time" id="progress-time">Time elapsed: 0s</div>
-    <div class="progress-error" id="progress-error" style="display: none;">
+    <div class="progress-error" id="progress-error" style="display: none;" role="alert">
       <p class="error-message"></p>
-      <button class="retry-button" id="retry-button">Try Again</button>
+      <button class="retry-button" id="retry-button" aria-label="Retry loading model">Try Again</button>
     </div>
   `;
 
@@ -70,12 +75,13 @@ export function createProgressBar(container: HTMLElement): void {
  * Update progress display.
  */
 export function updateProgress(progress: ModelProgress): void {
-  if (!progressBarInner || !progressText || !progressPhase || !progressTime) {
+  if (!progressBarInner || !progressText || !progressPhase || !progressTime || !progressContainer) {
     return;
   }
 
-  // Update progress bar width
+  // Update progress bar width and aria
   progressBarInner.style.width = `${progress.progress}%`;
+  progressContainer.setAttribute('aria-valuenow', String(Math.round(progress.progress)));
 
   // Update percentage text
   progressText.textContent = `${Math.round(progress.progress)}%`;

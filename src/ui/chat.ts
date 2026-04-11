@@ -38,6 +38,9 @@ export function createChatContainer(parent: HTMLElement): HTMLElement {
   messagesContainer = document.createElement('div');
   messagesContainer.className = 'chat-messages';
   messagesContainer.id = 'chat-messages';
+  messagesContainer.setAttribute('role', 'log');
+  messagesContainer.setAttribute('aria-live', 'polite');
+  messagesContainer.setAttribute('aria-label', 'Chat messages');
 
   chatContainer.appendChild(messagesContainer);
   parent.appendChild(chatContainer);
@@ -94,6 +97,8 @@ export function appendMessage(
   messageDiv.className = `chat-message chat-message-${message.role}`;
   messageDiv.id = `message-${message.id}`;
   messageDiv.setAttribute('data-timestamp', message.timestamp);
+  messageDiv.setAttribute('role', 'article');
+  messageDiv.setAttribute('aria-label', `${message.role === 'user' ? 'You' : 'Assistant'} message`);
 
   const bubbleDiv = document.createElement('div');
   bubbleDiv.className = 'chat-bubble';
@@ -159,6 +164,7 @@ function createCopyButton(id: string, content: string, type: 'message' | 'code')
   button.setAttribute('data-copy-id', id);
   button.setAttribute('data-copy-type', type);
   button.textContent = 'Copy';
+  button.setAttribute('aria-label', type === 'message' ? 'Copy message' : 'Copy code');
   button.title = type === 'message' ? 'Copy message' : 'Copy code';
   
   button.addEventListener('click', async (e) => {

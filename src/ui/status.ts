@@ -34,13 +34,17 @@ export function createStatusIndicator(container: HTMLElement): void {
   const statusBar = document.createElement('div');
   statusBar.className = 'status-bar';
   statusBar.id = 'status-bar';
+  statusBar.setAttribute('role', 'status');
+  statusBar.setAttribute('aria-live', 'polite');
+  statusBar.setAttribute('aria-label', 'Application status');
 
   // WebGPU status
   const webgpuIndicator = document.createElement('div');
   webgpuIndicator.className = 'status-indicator';
   webgpuIndicator.id = 'webgpu-status';
+  webgpuIndicator.setAttribute('aria-label', 'WebGPU status');
   webgpuIndicator.innerHTML = `
-    <span class="status-dot loading"></span>
+    <span class="status-dot loading" aria-hidden="true"></span>
     <span id="webgpu-text">Checking WebGPU...</span>
   `;
 
@@ -48,8 +52,9 @@ export function createStatusIndicator(container: HTMLElement): void {
   const onlineIndicator = document.createElement('div');
   onlineIndicator.className = 'status-indicator';
   onlineIndicator.id = 'online-status';
+  onlineIndicator.setAttribute('aria-label', 'Connection status');
   onlineIndicator.innerHTML = `
-    <span class="status-dot ${navigator.onLine ? 'success' : 'error'}"></span>
+    <span class="status-dot ${navigator.onLine ? 'success' : 'error'}" aria-hidden="true"></span>
     <span>${navigator.onLine ? 'Online' : 'Offline'}</span>
   `;
 
@@ -61,6 +66,7 @@ export function createStatusIndicator(container: HTMLElement): void {
   modelIndicator.className = 'status-indicator';
   modelIndicator.id = 'model-status';
   modelIndicator.style.display = 'none';
+  modelIndicator.setAttribute('aria-label', 'Model status');
   statusBar.appendChild(modelIndicator);
 
   container.appendChild(statusBar);

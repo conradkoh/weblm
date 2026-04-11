@@ -32,12 +32,15 @@ export function createMessageInput(
   // Create input container
   inputContainerElement = document.createElement('div');
   inputContainerElement.className = 'input-container';
+  inputContainerElement.setAttribute('role', 'form');
+  inputContainerElement.setAttribute('aria-label', 'Message input form');
 
   // Create textarea
   textareaElement = document.createElement('textarea');
   textareaElement.className = 'input-textarea';
   textareaElement.placeholder = 'Type a message...';
   textareaElement.rows = 1;
+  textareaElement.setAttribute('aria-label', 'Message input');
 
   // Create buttons container
   const buttonsContainer = document.createElement('div');
@@ -48,12 +51,14 @@ export function createMessageInput(
   sendButtonElement.className = 'button';
   sendButtonElement.textContent = 'Send';
   sendButtonElement.disabled = true;
+  sendButtonElement.setAttribute('aria-label', 'Send message');
 
   // Create stop button (hidden by default)
   stopButtonElement = document.createElement('button');
   stopButtonElement.className = 'button button-danger';
   stopButtonElement.textContent = 'Stop';
   stopButtonElement.style.display = 'none';
+  stopButtonElement.setAttribute('aria-label', 'Stop generation');
 
   // Add event listeners
   textareaElement.addEventListener('input', handleInput);

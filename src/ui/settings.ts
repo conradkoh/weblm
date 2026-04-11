@@ -73,6 +73,7 @@ export function createSettingsButton(container: HTMLElement): HTMLElement {
   button.className = 'settings-button';
   button.innerHTML = '⚙️';
   button.title = 'Settings';
+  button.setAttribute('aria-label', 'Open settings');
   button.addEventListener('click', () => {
     showSettingsPanel();
   });
@@ -95,11 +96,14 @@ export async function showSettingsPanel(): Promise<void> {
   // Create overlay
   settingsOverlay = document.createElement('div');
   settingsOverlay.className = 'settings-overlay';
+  settingsOverlay.setAttribute('role', 'dialog');
+  settingsOverlay.setAttribute('aria-modal', 'true');
+  settingsOverlay.setAttribute('aria-labelledby', 'settings-title');
   settingsOverlay.innerHTML = `
     <div class="settings-panel">
       <div class="settings-header">
-        <h2>Settings</h2>
-        <button class="settings-close" id="settings-close">✕</button>
+        <h2 id="settings-title">Settings</h2>
+        <button class="settings-close" id="settings-close" aria-label="Close settings">✕</button>
       </div>
       <div class="settings-content">
         <div class="settings-section">
@@ -361,21 +365,21 @@ function populateGenerationSettings(settings: AppSettings): void {
   container.innerHTML = `
     <div class="setting-row">
       <label for="temperature-slider">Temperature: <span id="temperature-value">${settings.temperature.toFixed(1)}</span></label>
-      <input type="range" id="temperature-slider" min="0" max="2" step="0.1" value="${settings.temperature}">
+      <input type="range" id="temperature-slider" min="0" max="2" step="0.1" value="${settings.temperature}" aria-label="Temperature slider">
       <span class="setting-hint">Higher = more creative, Lower = more deterministic</span>
     </div>
     <div class="setting-row">
       <label for="max-tokens-slider">Max Tokens: <span id="max-tokens-value">${settings.maxTokens}</span></label>
-      <input type="range" id="max-tokens-slider" min="16" max="4096" step="16" value="${settings.maxTokens}">
+      <input type="range" id="max-tokens-slider" min="16" max="4096" step="16" value="${settings.maxTokens}" aria-label="Max tokens slider">
       <span class="setting-hint">Maximum response length</span>
     </div>
     <div class="setting-row">
       <label for="top-p-slider">Top P: <span id="top-p-value">${settings.topP.toFixed(2)}</span></label>
-      <input type="range" id="top-p-slider" min="0" max="1" step="0.05" value="${settings.topP}">
+      <input type="range" id="top-p-slider" min="0" max="1" step="0.05" value="${settings.topP}" aria-label="Top P slider">
       <span class="setting-hint">Nucleus sampling threshold</span>
     </div>
     <div class="setting-row">
-      <button class="button button-secondary" id="reset-generation-btn">Reset to Defaults</button>
+      <button class="button button-secondary" id="reset-generation-btn" aria-label="Reset generation settings to defaults">Reset to Defaults</button>
     </div>
   `;
 
@@ -426,7 +430,7 @@ function populateSystemPrompt(settings: AppSettings): void {
   if (!container) return;
 
   container.innerHTML = `
-    <textarea id="system-prompt-input" rows="3" placeholder="Enter a system prompt...">${settings.systemPrompt}</textarea>
+    <textarea id="system-prompt-input" rows="3" placeholder="Enter a system prompt..." aria-label="System prompt">${settings.systemPrompt}</textarea>
     <span class="setting-hint">System prompt is prepended to all conversations.</span>
   `;
 
@@ -450,17 +454,17 @@ function populateThemeSettings(settings: AppSettings): void {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="theme-options">
+    <div class="theme-options" role="radiogroup" aria-label="Theme selection">
       <label class="theme-option ${settings.theme === 'light' ? 'selected' : ''}">
-        <input type="radio" name="theme" value="light" ${settings.theme === 'light' ? 'checked' : ''}>
+        <input type="radio" name="theme" value="light" ${settings.theme === 'light' ? 'checked' : ''} aria-label="Light theme">
         <span class="theme-label">☀️ Light</span>
       </label>
       <label class="theme-option ${settings.theme === 'dark' ? 'selected' : ''}">
-        <input type="radio" name="theme" value="dark" ${settings.theme === 'dark' ? 'checked' : ''}>
+        <input type="radio" name="theme" value="dark" ${settings.theme === 'dark' ? 'checked' : ''} aria-label="Dark theme">
         <span class="theme-label">🌙 Dark</span>
       </label>
       <label class="theme-option ${settings.theme === 'system' ? 'selected' : ''}">
-        <input type="radio" name="theme" value="system" ${settings.theme === 'system' ? 'checked' : ''}>
+        <input type="radio" name="theme" value="system" ${settings.theme === 'system' ? 'checked' : ''} aria-label="System theme">
         <span class="theme-label">💻 System</span>
       </label>
     </div>
@@ -492,8 +496,8 @@ function populateExportOptions(): void {
 
   container.innerHTML = `
     <div class="export-buttons">
-      <button class="button button-secondary" id="export-txt-btn">Export as Text (.txt)</button>
-      <button class="button button-secondary" id="export-md-btn">Export as Markdown (.md)</button>
+      <button class="button button-secondary" id="export-txt-btn" aria-label="Export chat as text file">Export as Text (.txt)</button>
+      <button class="button button-secondary" id="export-md-btn" aria-label="Export chat as markdown file">Export as Markdown (.md)</button>
     </div>
     <span class="setting-hint">Download current chat history as a file.</span>
   `;
@@ -524,7 +528,7 @@ function populatePerformanceSettings(settings: AppSettings): void {
   container.innerHTML = `
     <div class="setting-row">
       <label class="checkbox-label">
-        <input type="checkbox" id="show-metrics-checkbox" ${settings.showMetrics ? 'checked' : ''}>
+        <input type="checkbox" id="show-metrics-checkbox" ${settings.showMetrics ? 'checked' : ''} aria-label="Show performance metrics">
         <span>Show performance metrics</span>
       </label>
       <span class="setting-hint">Display TTFT, tokens/sec, and generation time below each response.</span>

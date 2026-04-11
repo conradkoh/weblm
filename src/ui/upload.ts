@@ -43,6 +43,8 @@ export function createUploadUI(
   dropZone = document.createElement('div');
   dropZone.className = 'drop-zone';
   dropZone.style.display = 'none';
+  dropZone.setAttribute('role', 'button');
+  dropZone.setAttribute('aria-label', 'Drop zone for file upload');
   dropZone.innerHTML = `
     <div class="drop-zone-content">
       <div class="drop-zone-icon">📄</div>
@@ -56,6 +58,7 @@ export function createUploadUI(
   fileInfo = document.createElement('div');
   fileInfo.className = 'file-info';
   fileInfo.style.display = 'none';
+  fileInfo.setAttribute('aria-live', 'polite');
   inputContainer.insertBefore(fileInfo, inputContainer.firstChild);
 
   // Create upload button
@@ -63,6 +66,7 @@ export function createUploadUI(
   uploadButton.className = 'upload-button';
   uploadButton.innerHTML = '📎';
   uploadButton.title = 'Upload file';
+  uploadButton.setAttribute('aria-label', 'Upload file');
   inputContainer.appendChild(uploadButton);
 
   // Hidden file input
@@ -70,6 +74,7 @@ export function createUploadUI(
   fileInput.type = 'file';
   fileInput.accept = SUPPORTED_TYPES.join(',');
   fileInput.style.display = 'none';
+  fileInput.setAttribute('aria-label', 'File upload input');
   inputContainer.appendChild(fileInput);
 
   // Event handlers

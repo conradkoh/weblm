@@ -44,6 +44,8 @@ let uploadUI: ReturnType<typeof createUploadUI> | null = null;
 function createModelSelectorUI(cachedModels: Set<ModelVariant>): HTMLElement {
   const container = document.createElement('div');
   container.id = 'model-selector-container';
+  container.setAttribute('role', 'radiogroup');
+  container.setAttribute('aria-label', 'Model selection');
   container.innerHTML = '<h3 style="margin-bottom: var(--spacing-md);">Select a Model</h3>';
 
   (['small', 'large'] as ModelVariant[]).forEach(model => {
@@ -53,6 +55,9 @@ function createModelSelectorUI(cachedModels: Set<ModelVariant>): HTMLElement {
     const optionDiv = document.createElement('div');
     optionDiv.className = 'model-option';
     optionDiv.setAttribute('data-model', model);
+    optionDiv.setAttribute('role', 'radio');
+    optionDiv.setAttribute('aria-checked', 'false');
+    optionDiv.setAttribute('tabindex', '0');
 
     optionDiv.innerHTML = `
       <span class="model-option-name">${info.name}</span>
@@ -63,9 +68,19 @@ function createModelSelectorUI(cachedModels: Set<ModelVariant>): HTMLElement {
     optionDiv.addEventListener('click', () => {
       container.querySelectorAll('.model-option').forEach(el => {
         el.classList.remove('selected');
+        el.setAttribute('aria-checked', 'false');
       });
       optionDiv.classList.add('selected');
+      optionDiv.setAttribute('aria-checked', 'true');
       currentModelVariant = model;
+    });
+
+    // Keyboard support
+    optionDiv.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        optionDiv.click();
+      }
     });
 
     container.appendChild(optionDiv);
@@ -75,10 +90,12 @@ function createModelSelectorUI(cachedModels: Set<ModelVariant>): HTMLElement {
   if (cachedModels.has('small')) {
     const smallOption = container.querySelector('[data-model="small"]');
     smallOption?.classList.add('selected');
+    smallOption?.setAttribute('aria-checked', 'true');
     currentModelVariant = 'small';
   } else {
     const defaultOption = container.querySelector(`[data-model="${DEFAULT_MODEL}"]`);
     defaultOption?.classList.add('selected');
+    defaultOption?.setAttribute('aria-checked', 'true');
   }
 
   return container;
@@ -95,12 +112,14 @@ function createLoadButtons(): { container: HTMLElement; setButtonsState: (enable
   loadButton.className = 'button';
   loadButton.id = 'load-button';
   loadButton.textContent = 'Load Model';
+  loadButton.setAttribute('aria-label', 'Load selected model');
 
   const clearButton = document.createElement('button');
   clearButton.className = 'button button-secondary';
   clearButton.id = 'clear-button';
   clearButton.textContent = 'Clear Cache';
   clearButton.style.display = 'none';
+  clearButton.setAttribute('aria-label', 'Clear cached model');
 
   container.appendChild(loadButton);
   container.appendChild(clearButton);
