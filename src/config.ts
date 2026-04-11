@@ -8,13 +8,16 @@
  * - Feature flags
  */
 
+import type { ModelRecord } from '@mlc-ai/web-llm';
+
 /**
  * Available model variants with their WebLLM model IDs.
- * 
- * Note: Using Gemma 2 models as Gemma 4 is not yet available in WebLLM's prebuilt config.
+ *
+ * - small: Gemma 3 1B (custom model config)
+ * - large: Gemma 2 9B (prebuilt config)
  */
 export const MODEL_IDS = {
-  small: 'gemma-2-2b-it-q4f16_1-MLC',
+  small: 'gemma-3-1b-it-q4f16_1-MLC',
   large: 'gemma-2-9b-it-q4f16_1-MLC',
 } as const;
 
@@ -33,9 +36,9 @@ export const DEFAULT_MODEL: ModelVariant = 'small';
  */
 export const MODEL_INFO: Record<ModelVariant, { name: string; size: string; vramMB: number }> = {
   small: {
-    name: 'Gemma 2 2B (Quantized)',
-    size: '~1.9 GB download',
-    vramMB: 1900,
+    name: 'Gemma 3 1B (Quantized)',
+    size: '~0.9 GB download',
+    vramMB: 1200,
   },
   large: {
     name: 'Gemma 2 9B (Quantized)',
@@ -88,3 +91,22 @@ export const MEMORY_THRESHOLDS = {
   /** Minimum available memory for large model */
   minLarge: 8000, // 8GB
 } as const;
+
+/**
+ * Custom model records for models not in WebLLM's prebuilt config.
+ *
+ * Gemma 3 1B requires a custom model record because it's not yet in the prebuilt config.
+ */
+export const CUSTOM_MODEL_RECORDS: ModelRecord[] = [
+  {
+    model: 'https://huggingface.co/mlc-ai/gemma-3-1b-it-q4f16_1-MLC',
+    model_id: 'gemma-3-1b-it-q4f16_1-MLC',
+    model_lib: 'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-3-1b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+    vram_required_MB: 1200,
+    low_resource_required: false,
+    required_features: ['shader-f16'],
+    overrides: {
+      context_window_size: 4096,
+    },
+  },
+];

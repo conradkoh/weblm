@@ -9,8 +9,8 @@
  * - Memory-aware model selection
  */
 
-import { CreateMLCEngine, type MLCEngine, type InitProgressReport } from '@mlc-ai/web-llm';
-import { MODEL_IDS, MODEL_INFO, DEFAULT_GENERATION_CONFIG, type ModelVariant } from '../config';
+import { CreateMLCEngine, prebuiltAppConfig, type MLCEngine, type InitProgressReport } from '@mlc-ai/web-llm';
+import { MODEL_IDS, MODEL_INFO, DEFAULT_GENERATION_CONFIG, CUSTOM_MODEL_RECORDS, type ModelVariant } from '../config';
 import type { ModelProgress, ProgressCallback } from './types';
 import type { ChatMessage } from '../types';
 import { logger } from '../logger';
@@ -75,8 +75,11 @@ export async function initializeEngine(
   const { signal } = loadingController;
 
   try {
-    // Create engine with progress callback
+    // Create engine with progress callback and custom model configs
     engine = await CreateMLCEngine(modelId, {
+      appConfig: {
+        model_list: [...prebuiltAppConfig.model_list, ...CUSTOM_MODEL_RECORDS],
+      },
       initProgressCallback: (report: InitProgressReport) => {
         if (signal.aborted) {
           throw new Error('Loading cancelled');

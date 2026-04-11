@@ -1,5 +1,5 @@
 /**
- * WebLM — Local-first AI chat powered by Gemma 4 via WebLLM.
+ * WebLM — Local-first AI chat powered by Gemma via WebLLM.
  *
  * Entry point. Initializes the UI and engine subsystems.
  */
