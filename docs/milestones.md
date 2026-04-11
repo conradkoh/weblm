@@ -96,20 +96,20 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.4.0 — Text Content Upload
+### 0.4.0 — Text Content Upload ✅
 *Codename: "Context"*
 
 **Summary:** Allow users to upload text content for local AI processing, addressing priority requirement #1.
 
 **Requirements:**
-- [ ] File upload button with drag-and-drop support
-- [ ] File picker for selecting files from disk
-- [ ] Supported formats: `.txt`, `.md`, `.csv`, `.json`
-- [ ] File size validation with clear limits (e.g., 5MB max)
-- [ ] Uploaded text content injected into conversation context
-- [ ] User can ask questions about uploaded content
-- [ ] Visual indication when file is loaded and ready
-- [ ] Clear uploaded file option to start fresh
+- [x] File upload button with drag-and-drop support
+- [x] File picker for selecting files from disk
+- [x] Supported formats: `.txt`, `.md`, `.csv`, `.json`
+- [x] File size validation with clear limits (5MB max)
+- [x] Uploaded text content injected into conversation context
+- [x] User can ask questions about uploaded content
+- [x] Visual indication when file is loaded and ready
+- [x] Clear uploaded file option to start fresh
 
 **Acceptance Criteria:**
 - Dragging a `.txt` file onto the chat shows a drop zone
@@ -121,6 +121,8 @@ These are the top user priorities that must be addressed prominently:
 - User can remove uploaded file and context is cleared
 
 **Dependencies:** 0.3.0 — requires working chat
+
+**✅ Completed: 2025-04-11 UTC**
 
 ---
 

@@ -12,6 +12,7 @@ import { createStatusIndicator, setWebGPUStatus, setOnlineStatus, setModelStatus
 import { createProgressBar, updateProgress, hideProgressBar, showProgressError } from './ui/progress';
 import { createChatContainer, appendMessage, appendToLastMessage, finishLastMessage, scrollToBottom, clearChat } from './ui/chat';
 import { createMessageInput, setInputDisabled, clearInput, focusInput } from './ui/input';
+import { createUploadUI, type UploadedFile } from './ui/upload';
 import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from './config';
 import type { ProgressCallback } from './engine/types';
 import type { ChatMessage } from './types';
@@ -22,12 +23,14 @@ let currentModelVariant: ModelVariant = DEFAULT_MODEL;
 let isLoading = false;
 let isGenerating = false;
 let messages: ChatMessage[] = [];
+let uploadedFile: UploadedFile | null = null;
 
 // UI element references
 let appContainer: HTMLElement | null = null;
 let statusBar: HTMLElement | null = null;
 let mainContent: HTMLElement | null = null;
 let chatMessagesContainer: HTMLElement | null = null;
+let uploadUI: ReturnType<typeof createUploadUI> | null = null;
 
 /**
  * Create the model selection UI.
@@ -137,6 +140,14 @@ function showChatUI(): void {
   // Create input UI
   createMessageInput(inputContainer, handleSendMessage, handleStopGeneration);
 
+  // Create upload UI
+  uploadUI = createUploadUI(
+    chatMessagesContainer,
+    inputContainer,
+    handleFileLoaded,
+    handleFileClear
+  );
+
   // Focus input
   focusInput();
 
@@ -146,6 +157,24 @@ function showChatUI(): void {
   setOnlineStatus(navigator.onLine);
 
   console.log('[weblm] chat UI ready');
+}
+
+/**
+ * Handle file loaded.
+ */
+function handleFileLoaded(file: UploadedFile): void {
+  uploadedFile = file;
+  uploadUI?.setFileInfo(file);
+  console.log(`[weblm] file loaded: ${file.name} (${file.size} bytes)`);
+}
+
+/**
+ * Handle file clear.
+ */
+function handleFileClear(): void {
+  uploadedFile = null;
+  uploadUI?.clearFileInfo();
+  console.log('[weblm] file cleared');
 }
 
 /**
@@ -182,9 +211,26 @@ async function handleSendMessage(userMessage: string): Promise<void> {
   clearInput();
 
   try {
+    // Prepare messages with file context if present
+    let messagesWithContext = [...messages.slice(0, -1)]; // All messages except assistant placeholder
+    
+    if (uploadedFile) {
+      // Add file content as a system message at the beginning
+      const systemMessage: ChatMessage = {
+        id: generateId(),
+        role: 'system',
+        content: `The user has uploaded a file named "${uploadedFile.name}". Here is its content:\n\n${uploadedFile.content}`,
+        timestamp: new Date().toISOString(),
+      };
+      messagesWithContext = [systemMessage, ...messagesWithContext];
+      
+      // Clear file after using it once (user can re-upload if needed)
+      handleFileClear();
+    }
+
     // Stream the response
     await sendMessage(
-      messages.slice(0, -1), // All messages except the streaming placeholder
+      messagesWithContext,
       (token) => {
         // Append token to last message
         assistantMsg.content += token;
