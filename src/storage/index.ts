@@ -1,22 +1,64 @@
 /**
- * Storage module — IndexedDB persistence layer.
+ * Storage module — cache status checking and management.
  *
  * Responsibilities:
- * - Model cache status checking
+ * - Model cache status checking for both WebLLM (IndexedDB) and Transformers.js (Cache API)
  * - Storage quota detection and management
- * - Model cache clearing utility
- * 
+ * - Model cache clearing utility for both runtimes
+ *
  * Note: WebLLM handles the actual model caching in IndexedDB internally.
- * We just provide convenience wrappers here.
+ *       Transformers.js uses the browser Cache API under the key 'transformers-cache'.
  */
 
 import { hasModelInCache, deleteModelAllInfoInCache } from '@mlc-ai/web-llm';
+import { TRANSFORMERS_MODEL_IDS } from '../engine/transformers-models';
 import { logger } from '../logger';
 
+/** The cache key used by @huggingface/transformers for model files */
+const TRANSFORMERS_CACHE_KEY = 'transformers-cache';
+
 /**
- * Check if a model is already cached in IndexedDB.
+ * Check if a Transformers.js model is cached in the browser Cache API.
+ * Uses a best-effort check: looks for any request matching the model ID in the cache.
+ */
+async function isTransformersModelCached(modelId: string): Promise<boolean> {
+  try {
+    if (typeof caches === 'undefined') return false;
+    const cache = await caches.open(TRANSFORMERS_CACHE_KEY);
+    const keys = await cache.keys();
+    // HF model files are stored under URLs like https://huggingface.co/{modelId}/...
+    return keys.some(req => req.url.includes(modelId));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Delete Transformers.js model files from the browser Cache API.
+ */
+async function deleteTransformersModelCache(modelId: string): Promise<void> {
+  try {
+    if (typeof caches === 'undefined') return;
+    const cache = await caches.open(TRANSFORMERS_CACHE_KEY);
+    const keys = await cache.keys();
+    const matching = keys.filter(req => req.url.includes(modelId));
+    await Promise.all(matching.map(req => cache.delete(req)));
+    logger.info(`Deleted ${matching.length} cache entries for ${modelId}`);
+  } catch (error) {
+    logger.error('Error clearing Transformers.js model cache:', error);
+    throw error;
+  }
+}
+
+/**
+ * Check if a model is already cached (runtime-aware).
+ * - WebLLM models: checks IndexedDB via hasModelInCache
+ * - Transformers.js models: checks browser Cache API
  */
 export async function checkModelCached(modelId: string): Promise<boolean> {
+  if (TRANSFORMERS_MODEL_IDS.has(modelId)) {
+    return isTransformersModelCached(modelId);
+  }
   try {
     return await hasModelInCache(modelId);
   } catch (error) {
@@ -26,9 +68,14 @@ export async function checkModelCached(modelId: string): Promise<boolean> {
 }
 
 /**
- * Clear a cached model from IndexedDB.
+ * Clear a cached model (runtime-aware).
+ * - WebLLM models: deletes from IndexedDB
+ * - Transformers.js models: deletes from browser Cache API
  */
 export async function clearCachedModel(modelId: string): Promise<void> {
+  if (TRANSFORMERS_MODEL_IDS.has(modelId)) {
+    return deleteTransformersModelCache(modelId);
+  }
   try {
     await deleteModelAllInfoInCache(modelId);
   } catch (error) {

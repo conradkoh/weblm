@@ -713,4 +713,18 @@ export const componentStyles = `
       font-size: var(--font-size-base);
       font-weight: 600;
     }
+
+    /* Runtime badge (shown in detail panel) */
+    .launcher-runtime-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .transformers-badge {
+      background-color: #16a34a;
+      color: white;
+    }
 `;

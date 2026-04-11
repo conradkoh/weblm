@@ -30,13 +30,6 @@ function formatContextWindow(tokens: number): string {
   return `${k}K ctx`;
 }
 
-function runtimeBadge(info: ModelInfo): string {
-  if (info.runtime === 'transformers.js') {
-    return ' <span class="launcher-runtime-badge transformers-badge" title="Runs via Transformers.js (ONNX/WebGPU) — supports larger context windows">🟢 Larger ctx</span>';
-  }
-  return '';
-}
-
 function formatOptionLabel(info: ModelInfo): string {
   const size = info.sizeGB > 0 ? ` (~${info.sizeGB} GB)` : '';
   const ctx = info.contextWindowSize > 0 ? `, ${formatContextWindow(info.contextWindowSize)}` : '';
