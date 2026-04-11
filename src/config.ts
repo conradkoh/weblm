@@ -55,6 +55,8 @@ export interface ModelInfo {
   sizeGB: number;
   /** VRAM required in MB (from WebLLM record) */
   vramMB: number;
+  /** Context window size in tokens */
+  contextWindowSize: number;
   /** Highlighted as a top recommendation in the UI */
   recommended?: boolean;
   /** Capability tags, e.g. ['coding', 'math', 'reasoning', 'vision'] */
@@ -248,6 +250,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     family: 'gemma',
     parameterSize: '1B',
     quantization: 'q4f16_1',
+    contextWindowSize: 4096,
     recommended: true,
     tags: [],
   },
@@ -256,6 +259,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     family: 'gemma',
     parameterSize: '4B',
     quantization: 'q4f16_1',
+    contextWindowSize: 4096,
     tags: [],
   },
   'gemma-3-12b-it-q4f16_1-MLC': {
@@ -263,6 +267,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     family: 'gemma',
     parameterSize: '12B',
     quantization: 'q4f16_1',
+    contextWindowSize: 4096,
     tags: [],
   },
   'gemma-3-27b-it-q4f16_1-MLC': {
@@ -270,6 +275,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     family: 'gemma',
     parameterSize: '27B',
     quantization: 'q4f16_1',
+    contextWindowSize: 4096,
     tags: [],
   },
 };
@@ -299,15 +305,17 @@ function shouldExclude(record: ModelRecord): boolean {
 function buildModelInfo(record: ModelRecord, curated?: Partial<ModelInfo>): ModelInfo {
   const modelId = record.model_id;
   const vramMB = record.vram_required_MB ?? 0;
+  const contextWindowSize = (record.overrides as { context_window_size?: number } | undefined)?.context_window_size ?? 4096;
 
   const auto: ModelInfo = {
     modelId,
-    displayName:   autoDisplayName(modelId),
-    family:        detectFamily(modelId),
-    parameterSize: extractParamSize(modelId),
-    quantization:  extractQuantization(modelId),
-    sizeGB:        estimateSizeGB(vramMB),
+    displayName:       autoDisplayName(modelId),
+    family:            detectFamily(modelId),
+    parameterSize:     extractParamSize(modelId),
+    quantization:      extractQuantization(modelId),
+    sizeGB:            estimateSizeGB(vramMB),
     vramMB,
+    contextWindowSize,
   };
 
   return { ...auto, ...CURATED[modelId], ...curated };

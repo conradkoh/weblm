@@ -25,9 +25,15 @@ function getFamilyLabel(familyId: string): string {
   return MODEL_FAMILIES.find(f => f.id === familyId)?.name ?? familyId;
 }
 
+function formatContextWindow(tokens: number): string {
+  const k = Math.round(tokens / 1024);
+  return `${k}K ctx`;
+}
+
 function formatOptionLabel(info: ModelInfo): string {
   const size = info.sizeGB > 0 ? ` (~${info.sizeGB} GB)` : '';
-  return `${info.displayName}${size}`;
+  const ctx = info.contextWindowSize > 0 ? `, ${formatContextWindow(info.contextWindowSize)}` : '';
+  return `${info.displayName}${size}${ctx}`;
 }
 
 function renderDetailPanel(
@@ -43,6 +49,7 @@ function renderDetailPanel(
   const familyDesc = MODEL_FAMILIES.find(f => f.id === info.family)?.description ?? '';
   const sizeStr = info.sizeGB > 0 ? `~${info.sizeGB} GB` : info.vramMB > 0 ? `${info.vramMB} MB` : 'Unknown';
   const vramStr = info.vramMB > 0 ? `~${Math.round(info.vramMB / 1024 * 10) / 10} GB` : 'Unknown';
+  const ctxStr = info.contextWindowSize > 0 ? formatContextWindow(info.contextWindowSize) : 'Unknown';
   const tagHtml = (info.tags ?? []).length > 0
     ? info.tags!.map(t => `<span class="launcher-tag">${t}</span>`).join('')
     : '';
@@ -59,6 +66,10 @@ function renderDetailPanel(
       <div class="launcher-detail-row">
         <span class="launcher-detail-label">VRAM needed</span>
         <span class="launcher-detail-value">${vramStr}</span>
+      </div>
+      <div class="launcher-detail-row">
+        <span class="launcher-detail-label">Context window</span>
+        <span class="launcher-detail-value">${ctxStr}</span>
       </div>
       ${tagHtml ? `
       <div class="launcher-detail-row">
