@@ -1,6 +1,6 @@
 /**
  * Error recovery and handling for WebLLM engine.
- * 
+ *
  * Responsibilities:
  * - Categorize errors (OOM, device lost, network, unknown)
  * - Attempt automatic recovery from transient errors
@@ -8,7 +8,7 @@
  * - Provide user-friendly error messages
  */
 
-import { MODEL_INFO, MODEL_VARIANTS, type ModelVariant } from '../config';
+import { getModelInfo, getModelCatalog } from '../config';
 import { logger } from '../logger';
 
 /** Error categories */
@@ -19,7 +19,7 @@ export interface RecoveryResult {
   success: boolean;
   message: string;
   shouldSwitchModel?: boolean;
-  recommendedModel?: ModelVariant;
+  recommendedModel?: string;
 }
 
 /** Error context for tracking */
@@ -37,17 +37,26 @@ const errorHistory: ErrorContext[] = [];
 const MAX_RETRIES = 3;
 
 /**
- * Get the next smaller model in the fallback chain.
- * Fallback order: 27b -> 12b -> 4b -> 1b
+ * Get the next smaller model for fallback.
+ * Prefers same family; falls back across families.
+ * Returns null if the current model is already the smallest available.
  */
-function getSmallerModel(model: ModelVariant): ModelVariant | null {
-  const fallbackOrder: ModelVariant[] = ['gemma3-27b', 'gemma3-12b', 'gemma3-4b', 'gemma3-1b'];
-  const index = fallbackOrder.indexOf(model);
-  // If not found or already at smallest (last index), return null
-  if (index === -1 || index === fallbackOrder.length - 1) {
-    return null;
-  }
-  return fallbackOrder[index + 1] ?? null;
+function getSmallerModel(modelId: string): string | null {
+  const current = getModelInfo(modelId);
+  if (!current) return null;
+
+  const catalog = getModelCatalog();
+
+  // Find models with strictly less VRAM, sorted descending (largest first so we pick closest fit)
+  const candidates = catalog
+    .filter(m => m.vramMB > 0 && m.vramMB < current.vramMB)
+    .sort((a, b) => b.vramMB - a.vramMB);
+
+  if (candidates.length === 0) return null;
+
+  // Prefer same family
+  const sameFamilyCandidate = candidates.find(m => m.family === current.family);
+  return (sameFamilyCandidate ?? candidates[0])!.modelId;
 }
 
 /**
@@ -57,7 +66,6 @@ export function categorizeError(error: Error): ErrorCategory {
   const message = error.message.toLowerCase();
   const name = error.name?.toLowerCase() || '';
 
-  // Check for OOM errors
   if (
     message.includes('out of memory') ||
     message.includes('oom') ||
@@ -68,7 +76,6 @@ export function categorizeError(error: Error): ErrorCategory {
     return 'oom';
   }
 
-  // Check for device lost errors
   if (
     message.includes('device lost') ||
     message.includes('device was lost') ||
@@ -79,7 +86,6 @@ export function categorizeError(error: Error): ErrorCategory {
     return 'device-lost';
   }
 
-  // Check for network errors
   if (
     message.includes('network') ||
     message.includes('fetch failed') ||
@@ -90,7 +96,6 @@ export function categorizeError(error: Error): ErrorCategory {
     return 'network';
   }
 
-  // Check for validation errors
   if (
     message.includes('validation') ||
     message.includes('invalid') ||
@@ -133,7 +138,6 @@ export function trackError(category: ErrorCategory, error: Error): void {
     timestamp,
   });
 
-  // Keep only last 10 errors
   if (errorHistory.length > 10) {
     errorHistory.shift();
   }
@@ -146,29 +150,25 @@ export function trackError(category: ErrorCategory, error: Error): void {
  */
 export function getRecentErrorCount(category: ErrorCategory, withinMs: number = 60000): number {
   const now = Date.now();
-  return errorHistory.filter(e => 
-    e.lastCategory === category && (now - e.timestamp) < withinMs
+  return errorHistory.filter(
+    e => e.lastCategory === category && (now - e.timestamp) < withinMs
   ).length;
 }
 
 /**
  * Determine if automatic recovery is possible.
  */
-export function canAutoRecover(category: ErrorCategory, currentModel: ModelVariant): boolean {
+export function canAutoRecover(category: ErrorCategory, currentModelId: string): boolean {
   const recentCount = getRecentErrorCount(category);
-  
-  // For device-lost errors, we can try to reload the model
+
   if (category === 'device-lost' && recentCount < MAX_RETRIES) {
     return true;
   }
 
-  // For OOM errors, we can try switching to a smaller model
   if (category === 'oom' && recentCount < MAX_RETRIES) {
-    // Can switch if there's a smaller model available
-    return getSmallerModel(currentModel) !== null;
+    return getSmallerModel(currentModelId) !== null;
   }
 
-  // Network errors can be retried
   if (category === 'network' && recentCount < MAX_RETRIES) {
     return true;
   }
@@ -179,12 +179,11 @@ export function canAutoRecover(category: ErrorCategory, currentModel: ModelVaria
 /**
  * Get recommended action for recovery.
  */
-export function getRecoveryAction(category: ErrorCategory, currentModel: ModelVariant): RecoveryResult {
-  const success = canAutoRecover(category, currentModel);
-  
-  // For OOM, recommend smaller model
+export function getRecoveryAction(category: ErrorCategory, currentModelId: string): RecoveryResult {
+  const success = canAutoRecover(category, currentModelId);
+
   if (category === 'oom') {
-    const smallerModel = getSmallerModel(currentModel);
+    const smallerModel = getSmallerModel(currentModelId);
     if (smallerModel) {
       return {
         success,
@@ -195,7 +194,6 @@ export function getRecoveryAction(category: ErrorCategory, currentModel: ModelVa
     }
   }
 
-  // For device-lost, recommend reload
   if (category === 'device-lost') {
     return {
       success,
@@ -203,7 +201,6 @@ export function getRecoveryAction(category: ErrorCategory, currentModel: ModelVa
     };
   }
 
-  // For network, recommend retry
   if (category === 'network') {
     return {
       success,
@@ -211,30 +208,28 @@ export function getRecoveryAction(category: ErrorCategory, currentModel: ModelVa
     };
   }
 
-  // For other errors, give general guidance
   return {
     success: false,
     message: getErrorMessage(category, new Error('Unknown error')),
     shouldSwitchModel: getRecentErrorCount('oom') >= 2,
-    recommendedModel: 'gemma3-1b',
+    recommendedModel: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
   };
 }
 
 /**
  * Check if device memory is sufficient for a model.
  */
-export function checkMemorySufficient(model: ModelVariant): { sufficient: boolean; available: number; required: number } {
-  // Use navigator.deviceMemory if available (Chrome only)
+export function checkMemorySufficient(modelId: string): { sufficient: boolean; available: number; required: number } {
   const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  
+
   if (deviceMemory === undefined) {
-    // Can't determine - assume sufficient
     return { sufficient: true, available: 0, required: 0 };
   }
 
   const deviceMemoryMB = deviceMemory * 1024;
-  const requiredMB = MODEL_INFO[model].vramMB;
-  const sufficient = deviceMemoryMB >= requiredMB;
+  const info = getModelInfo(modelId);
+  const requiredMB = info?.vramMB ?? 0;
+  const sufficient = requiredMB === 0 || deviceMemoryMB >= requiredMB;
 
   return {
     sufficient,
@@ -246,14 +241,13 @@ export function checkMemorySufficient(model: ModelVariant): { sufficient: boolea
 /**
  * Get memory warning message if applicable.
  */
-export function getMemoryWarning(model: ModelVariant): string | null {
-  const { sufficient, available, required } = checkMemorySufficient(model);
-  
+export function getMemoryWarning(modelId: string): string | null {
+  const { sufficient, available, required } = checkMemorySufficient(modelId);
+
   if (!sufficient) {
     return `Warning: Your device may have insufficient memory for this model. Available: ~${Math.round(available / 1000)}GB, Required: ~${Math.round(required / 1000)}GB. Consider using a smaller model.`;
   }
 
-  // Check if memory is tight (between 80-100% of required)
   if (available > 0 && available < required * 1.2) {
     return `Notice: Memory is tight. Available: ~${Math.round(available / 1000)}GB. Close other tabs for best performance.`;
   }

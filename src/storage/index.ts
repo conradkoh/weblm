@@ -11,14 +11,12 @@
  */
 
 import { hasModelInCache, deleteModelAllInfoInCache } from '@mlc-ai/web-llm';
-import { MODEL_IDS, type ModelVariant } from '../config';
 import { logger } from '../logger';
 
 /**
  * Check if a model is already cached in IndexedDB.
  */
-export async function checkModelCached(model: ModelVariant): Promise<boolean> {
-  const modelId = MODEL_IDS[model];
+export async function checkModelCached(modelId: string): Promise<boolean> {
   try {
     return await hasModelInCache(modelId);
   } catch (error) {
@@ -30,8 +28,7 @@ export async function checkModelCached(model: ModelVariant): Promise<boolean> {
 /**
  * Clear a cached model from IndexedDB.
  */
-export async function clearCachedModel(model: ModelVariant): Promise<void> {
-  const modelId = MODEL_IDS[model];
+export async function clearCachedModel(modelId: string): Promise<void> {
   try {
     await deleteModelAllInfoInCache(modelId);
   } catch (error) {

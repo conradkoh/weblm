@@ -7,7 +7,7 @@
  * - Wire up event listeners via callbacks
  */
 
-import { MODEL_INFO, type ModelVariant } from '../config';
+import { getModelInfo } from '../config';
 import { createStatusIndicator, setWebGPUStatus, setModelStatus, setOnlineStatus } from './status';
 import { createChatContainer } from './chat';
 import { createMessageInput } from './input';
@@ -23,7 +23,7 @@ export interface ChatPageCallbacks {
   onNewChat: () => Promise<void>;
   onSendMessage: (message: string) => Promise<void>;
   onStopGeneration: () => void;
-  onModelSwitch: (model: ModelVariant) => Promise<void>;
+  onModelSwitch: (model: string) => Promise<void>;
   onFileLoaded: (file: UploadedFile) => void;
   onFileClear: () => void;
   onExportText: () => void;
@@ -45,7 +45,7 @@ export interface ChatPageElements {
 export function createChatPage(
   mainContent: HTMLElement,
   appContainer: HTMLElement,
-  currentModelVariant: ModelVariant,
+  currentModelId: string,
   callbacks: ChatPageCallbacks,
   getUploadedFile: () => UploadedFile | null
 ): ChatPageElements {
@@ -82,7 +82,7 @@ export function createChatPage(
   newStatusBar.appendChild(statusSection);
 
   setWebGPUStatus(true);
-  setModelStatus(MODEL_INFO[currentModelVariant].name, false);
+  setModelStatus(getModelInfo(currentModelId)?.displayName ?? currentModelId, false);
 
   // Create chat container
   const chatMessagesContainer = createChatContainer(mainContent);
@@ -110,7 +110,7 @@ export function createChatPage(
 
   // Handle model switch event
   window.addEventListener('model-switch', ((e: Event) => {
-    const customEvent = e as CustomEvent<{ model: ModelVariant }>;
+    const customEvent = e as CustomEvent<{ model: string }>;
     callbacks.onModelSwitch(customEvent.detail.model);
   }) as EventListener);
 

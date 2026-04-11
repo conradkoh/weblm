@@ -12,10 +12,9 @@
  * - Chat export (text/markdown)
  */
 
-import { MODEL_INFO, DEFAULT_GENERATION_CONFIG, type ModelVariant } from '../config';
+import { getModelCatalog, getModelInfo, DEFAULT_MODEL_ID, DEFAULT_GENERATION_CONFIG } from '../config';
 import { checkModelCached, clearCachedModel, getStorageEstimate } from '../storage/index';
 import { getCurrentModel, unloadEngine, getIsGenerating } from '../engine/index';
-import type { ModelVariant as EngineModelVariant } from '../engine/types';
 import {
   loadSettings,
   saveSettings,
@@ -50,8 +49,8 @@ let settingsOverlay: HTMLElement | null = null;
 let systemThemeUnsubscribe: (() => void) | null = null;
 
 /** Callback types */
-export type ModelChangeCallback = (model: ModelVariant) => Promise<void>;
-export type ModelClearCallback = (model: ModelVariant) => Promise<void>;
+export type ModelChangeCallback = (modelId: string) => Promise<void>;
+export type ModelClearCallback = (modelId: string) => Promise<void>;
 export type SettingsChangeCallback = (settings: AppSettings) => void;
 export type ExportCallback = (format: 'txt' | 'md') => void;
 
@@ -205,67 +204,65 @@ async function populateModelList(): Promise<void> {
 
   modelList.innerHTML = '';
 
-  const currentModel = getCurrentModel();
-  const cachedModels = new Set<ModelVariant>();
+  const currentModelId = getCurrentModel();
+  const catalog = getModelCatalog();
 
-  // Check cache status for all models
-  for (const model of ['gemma3-1b', 'gemma3-4b', 'gemma3-12b', 'gemma3-27b'] as ModelVariant[]) {
-    const isCached = await isModelCached(model);
-    if (isCached) cachedModels.add(model);
-  }
+  // Check cache status for all models in the catalog
+  const cachedSet = new Set<string>();
+  await Promise.all(
+    catalog.map(async info => {
+      if (await isModelCached(info.modelId)) cachedSet.add(info.modelId);
+    })
+  );
 
-  // Create model cards (import needed)
-  const { MODEL_VARIANTS } = await import('../config');
-  MODEL_VARIANTS.forEach(model => {
-    const info = MODEL_INFO[model];
-    const isCached = cachedModels.has(model);
-    const isCurrent = currentModel === model;
-    const hasWasm = info.hasWasm;
+  for (const info of catalog) {
+    const isCached = cachedSet.has(info.modelId);
+    const isCurrent = currentModelId === info.modelId;
 
     const card = document.createElement('div');
     card.className = 'model-card';
     if (isCurrent) card.classList.add('current');
     if (isCached) card.classList.add('cached');
-    if (!hasWasm) card.classList.add('warning');
 
-    const warningIcon = !hasWasm ? ' ⚠️' : '';
-    const warningText = !hasWasm ? ' (WASM pending)' : '';
+    const sizeStr = info.sizeGB > 0 ? `~${info.sizeGB} GB` : info.vramMB > 0 ? `~${info.vramMB} MB VRAM` : '';
+    const tagHtml = (info.tags ?? []).map(t => `<span class="model-tag">${t}</span>`).join('');
 
     card.innerHTML = `
       <div class="model-card-header">
-        <span class="model-name">${info.name}${warningText}${warningIcon}</span>
+        <span class="model-name">${info.displayName}</span>
+        ${tagHtml}
         ${isCurrent ? '<span class="model-badge current-badge">Loaded</span>' : ''}
         ${isCached && !isCurrent ? '<span class="model-badge cached-badge">Cached</span>' : ''}
       </div>
       <div class="model-card-info">
-        <span class="model-size">Size: ${info.size}</span>
-        <span class="model-memory">VRAM: ~${Math.round(info.vramMB / 1000)}GB</span>
+        ${sizeStr ? `<span class="model-size">${sizeStr}</span>` : ''}
+        ${info.vramMB ? `<span class="model-memory">VRAM: ~${Math.round(info.vramMB / 1000)}GB</span>` : ''}
       </div>
       <div class="model-card-actions">
         ${isCurrent ? '<span class="model-action-label">Currently loaded</span>' : ''}
-        ${!isCurrent && hasWasm ? `<button class="button model-switch-btn" data-model="${model}">Switch to this model</button>` : ''}
-        ${!hasWasm ? '<span class="model-action-label warning">Not yet available</span>' : ''}
-        ${isCached && !isCurrent ? `<button class="button button-secondary model-clear-btn" data-model="${model}">Clear cache</button>` : ''}
+        ${!isCurrent ? `<button class="button model-switch-btn" data-model="${info.modelId}">Switch to this model</button>` : ''}
+        ${isCached && !isCurrent ? `<button class="button button-secondary model-clear-btn" data-model="${info.modelId}">Clear cache</button>` : ''}
       </div>
     `;
 
     modelList.appendChild(card);
-  });
+  }
 
-  // Add event listeners
+  // Event listeners
   modelList.querySelectorAll('.model-switch-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const model = (btn as HTMLElement).dataset.model as ModelVariant;
+      const modelId = (btn as HTMLElement).dataset.model!;
       hideSettingsPanel();
-      window.dispatchEvent(new CustomEvent('model-switch', { detail: { model } }));
+      window.dispatchEvent(new CustomEvent('model-switch', { detail: { model: modelId } }));
     });
   });
 
   modelList.querySelectorAll('.model-clear-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const model = (btn as HTMLElement).dataset.model as ModelVariant;
-      if (confirm(`Clear cache for ${MODEL_INFO[model].name}? You'll need to download it again.`)) {
-        await deleteCachedModel(model);
+      const modelId = (btn as HTMLElement).dataset.model!;
+      const info = getModelInfo(modelId);
+      if (confirm(`Clear cache for ${info?.displayName ?? modelId}? You'll need to download it again.`)) {
+        await deleteCachedModel(modelId);
         await populateModelList();
         await updateStorageInfo();
       }
@@ -308,23 +305,23 @@ function updateMemoryInfo(): void {
   const memoryMB = storedMemory ? parseInt(storedMemory, 10) : 0;
 
   let recommendation = '';
-  let recommendedModel: ModelVariant = 'gemma3-1b';
+  let recommendedModelId: string = DEFAULT_MODEL_ID;
 
   if (memoryMB < 2000) {
-    recommendation = '⚠️ Low memory detected. The smallest model (Gemma 3 1B) is recommended. Performance may be limited.';
-    recommendedModel = 'gemma3-1b';
-  } else if (memoryMB < 5000) {
-    recommendation = '✓ The 1B model is recommended for your available memory.';
-    recommendedModel = 'gemma3-1b';
+    recommendation = '⚠️ Low memory detected. A small model like SmolLM 1.7B or Qwen3 0.6B is recommended.';
+    recommendedModelId = 'SmolLM2-1.7B-Instruct-q4f16_1-MLC';
+  } else if (memoryMB < 4000) {
+    recommendation = '✓ Qwen3 1.7B or Llama 3.2 1B should work well for your available memory.';
+    recommendedModelId = 'Qwen3-1.7B-q4f16_1-MLC';
+  } else if (memoryMB < 6000) {
+    recommendation = '✓ Qwen3 4B is recommended. It offers a good balance of quality and speed.';
+    recommendedModelId = 'Qwen3-4B-q4f16_1-MLC';
   } else if (memoryMB < 10000) {
-    recommendation = '✓ You can run the 4B model. Consider starting with the 1B for faster responses.';
-    recommendedModel = 'gemma3-4b';
-  } else if (memoryMB < 20000) {
-    recommendation = '✓ You can run up to the 12B model. The 4B model offers good performance.';
-    recommendedModel = 'gemma3-12b';
+    recommendation = '✓ You can run 7-8B models. Qwen3 8B or Llama 3.1 8B offer strong quality.';
+    recommendedModelId = 'Qwen3-8B-q4f16_1-MLC';
   } else {
-    recommendation = '✓ You have enough memory for all models. The 27B model offers the best quality.';
-    recommendedModel = 'gemma3-27b';
+    recommendation = '✓ You have enough memory for large models. DeepSeek R1 or Llama 3.1 70B are excellent choices.';
+    recommendedModelId = 'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC';
   }
 
   memoryInfo.innerHTML = `

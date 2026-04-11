@@ -10,24 +10,22 @@
  */
 
 import { CreateMLCEngine, prebuiltAppConfig, type MLCEngine, type InitProgressReport } from '@mlc-ai/web-llm';
-import { MODEL_IDS, MODEL_INFO, DEFAULT_GENERATION_CONFIG, CUSTOM_MODEL_RECORDS, type ModelVariant } from '../config';
+import { getModelInfo, DEFAULT_GENERATION_CONFIG, GEMMA3_MODEL_RECORDS } from '../config';
 import type { ModelProgress, ProgressCallback } from './types';
 import type { ChatMessage } from '../types';
 import { logger } from '../logger';
 
 // Module-level state
 let engine: MLCEngine | null = null;
-let currentModel: ModelVariant | null = null;
+let currentModelId: string | null = null;
 let loadingController: AbortController | null = null;
 let isGenerating = false;
 
 /**
  * Check if a model is already cached in IndexedDB.
  */
-export function isModelCached(model: ModelVariant): Promise<boolean> {
-  const modelId = MODEL_IDS[model];
-  // Dynamically import to avoid bundling issues
-  return import('@mlc-ai/web-llm').then(({ hasModelInCache }) => 
+export function isModelCached(modelId: string): Promise<boolean> {
+  return import('@mlc-ai/web-llm').then(({ hasModelInCache }) =>
     hasModelInCache(modelId)
   );
 }
@@ -49,51 +47,50 @@ export async function getStorageEstimate(): Promise<{ quota: number; usage: numb
 /**
  * Check if there's enough storage for a model.
  */
-export async function hasEnoughStorage(model: ModelVariant): Promise<boolean> {
-  const modelInfo = MODEL_INFO[model];
+export async function hasEnoughStorage(modelId: string): Promise<boolean> {
+  const info = getModelInfo(modelId);
+  if (!info) return true; // Unknown model — optimistically allow
   const { quota, usage } = await getStorageEstimate();
   const availableSpace = quota - usage;
-  // Need at least 1.5x the model size to be safe
-  return availableSpace > modelInfo.vramMB * 1.5 * 1024 * 1024;
+  // Need at least 1.5× the VRAM estimate as a proxy for download size
+  return availableSpace > info.vramMB * 1.5 * 1024 * 1024;
 }
 
 /**
  * Initialize the WebLLM engine with a specific model.
- * 
- * This downloads the model if not cached, then initializes the engine.
+ *
+ * Downloads the model if not cached, then initializes the engine.
  * Progress is reported via the callback.
  */
 export async function initializeEngine(
-  model: ModelVariant,
+  modelId: string,
   onProgress?: ProgressCallback
 ): Promise<void> {
-  const modelId = MODEL_IDS[model];
-  const modelInfo = MODEL_INFO[model];
+  const info = getModelInfo(modelId);
+  const displayName = info?.displayName ?? modelId;
 
-  // Create abort controller for potential cancellation
   loadingController = new AbortController();
   const { signal } = loadingController;
 
   try {
-    // Create engine with progress callback and custom model configs
     engine = await CreateMLCEngine(modelId, {
       appConfig: {
-        model_list: [...prebuiltAppConfig.model_list, ...CUSTOM_MODEL_RECORDS],
+        // Merge prebuilt list with Gemma 3 custom records
+        model_list: [...prebuiltAppConfig.model_list, ...GEMMA3_MODEL_RECORDS],
       },
       initProgressCallback: (report: InitProgressReport) => {
         if (signal.aborted) {
           throw new Error('Loading cancelled');
         }
 
-        // Convert WebLLM progress to our format
         const progress: ModelProgress = {
-          phase: report.text?.toLowerCase().includes('download') 
-            ? 'downloading' 
-            : report.text?.toLowerCase().includes('compil') 
-              ? 'compiling' 
+          phase: report.text?.toLowerCase().includes('download')
+            ? 'downloading'
+            : report.text?.toLowerCase().includes('compil')
+              ? 'compiling'
               : 'loading',
           progress: Math.round(report.progress * 100),
-          message: report.text || `Loading ${modelInfo.name}...`,
+          message: report.text || `Loading ${displayName}...`,
           timeElapsed: report.timeElapsed,
         };
 
@@ -101,18 +98,17 @@ export async function initializeEngine(
       },
     });
 
-    currentModel = model;
+    currentModelId = modelId;
 
-    // Report completion
     onProgress?.({
       phase: 'ready',
       progress: 100,
-      message: `${modelInfo.name} loaded successfully!`,
+      message: `${displayName} loaded successfully!`,
     });
 
   } catch (error) {
     engine = null;
-    currentModel = null;
+    currentModelId = null;
     throw error;
   } finally {
     loadingController = null;
@@ -129,30 +125,22 @@ export function cancelLoading(): void {
   }
 }
 
-/**
- * Get the current engine instance.
- */
+/** Get the current engine instance. */
 export function getEngine(): MLCEngine | null {
   return engine;
 }
 
-/**
- * Check if a model is currently loaded.
- */
+/** Check if a model is currently loaded. */
 export function isModelLoaded(): boolean {
   return engine !== null;
 }
 
-/**
- * Get the currently loaded model variant.
- */
-export function getCurrentModel(): ModelVariant | null {
-  return currentModel;
+/** Get the currently loaded model ID. */
+export function getCurrentModel(): string | null {
+  return currentModelId;
 }
 
-/**
- * Check if the engine is currently generating.
- */
+/** Check if the engine is currently generating. */
 export function getIsGenerating(): boolean {
   return isGenerating;
 }
@@ -163,10 +151,8 @@ export function getIsGenerating(): boolean {
 export async function unloadEngine(): Promise<void> {
   if (engine) {
     try {
-      // WebLLM engines don't have an explicit unload method,
-      // but we can clear our reference
       engine = null;
-      currentModel = null;
+      currentModelId = null;
     } catch (error) {
       logger.error('Error unloading engine:', error);
     }
@@ -176,8 +162,7 @@ export async function unloadEngine(): Promise<void> {
 /**
  * Delete cached model data from IndexedDB.
  */
-export async function deleteCachedModel(model: ModelVariant): Promise<void> {
-  const modelId = MODEL_IDS[model];
+export async function deleteCachedModel(modelId: string): Promise<void> {
   const { deleteModelAllInfoInCache } = await import('@mlc-ai/web-llm');
   await deleteModelAllInfoInCache(modelId);
 }
@@ -196,12 +181,6 @@ function toWebLLMMessages(messages: ChatMessage[]): Array<{ role: 'user' | 'assi
 
 /**
  * Send a message to the model and stream the response.
- * 
- * @param messages - Chat history (will be converted to WebLLM format)
- * @param onToken - Callback for each token received
- * @param onComplete - Callback when generation is complete
- * @param onError - Callback for errors
- * @param options - Optional generation settings
  */
 export async function sendMessage(
   messages: ChatMessage[],

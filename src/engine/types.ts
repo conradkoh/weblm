@@ -5,12 +5,10 @@
  * and inference operations.
  */
 
-import type { ModelVariant } from '../config';
-
 /**
- * Re-export ModelVariant from config for convenience.
+ * Model ID type — a plain string (WebLLM model_id).
  */
-export type { ModelVariant };
+export type ModelVariant = string;
 
 /**
  * Model loading state.

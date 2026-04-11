@@ -20,7 +20,7 @@ import { createSettingsButton, showSettingsPanel, hideSettingsPanel, refreshSett
 import { registerServiceWorker, setupOfflineDetection, onOfflineStatusChange } from './sw';
 import { loadSettings, getTemperature, getMaxTokens, getTopP, getSystemPrompt, getEffectiveTheme, getShowMetrics, setShowMetrics } from './settings';
 import { startGeneration, recordFirstToken, incrementTokenCount, completeGeneration, createMetricsElement, isMetricsEnabled, loadMetricsPreference } from './ui/metrics';
-import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from './config';
+import { getModelInfo, DEFAULT_MODEL_ID, getModelCatalog } from './config';
 import type { ProgressCallback } from './engine/types';
 import type { ChatMessage } from './types';
 import { generateId } from './types';
@@ -30,7 +30,7 @@ import { createChatPage, renderMessages } from './ui/chat-page';
 import { createFileHandlers } from './app/file-handler';
 
 // Application state
-let currentModelVariant: ModelVariant = DEFAULT_MODEL;
+let currentModelId: string = DEFAULT_MODEL_ID;
 let isLoading = false;
 let isGenerating = false;
 let messages: ChatMessage[] = [];
@@ -62,7 +62,7 @@ async function showChatUI(): Promise<void> {
   const elements = createChatPage(
     mainContent,
     appContainer,
-    currentModelVariant,
+    currentModelId,
     {
       onNewChat: handleNewChat,
       onSendMessage: handleSendMessage,
@@ -151,14 +151,14 @@ async function handleNewChat(): Promise<void> {
 /**
  * Handle model switch.
  */
-async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
+async function handleModelSwitch(newModelId: string): Promise<void> {
   if (getIsGenerating()) {
     alert('Cannot switch model while generating. Please wait for the current response to complete.');
     return;
   }
 
   const currentModel = getCurrentModel();
-  if (currentModel === newModel) {
+  if (currentModel === newModelId) {
     return; // Already using this model
   }
 
@@ -175,8 +175,11 @@ async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
     logger.error('failed to clear chat history:', error);
   }
 
+  const newModelInfo = getModelInfo(newModelId);
+  const displayName = newModelInfo?.displayName ?? newModelId;
+
   // Show loading state
-  setModelStatus(MODEL_INFO[newModel].name, true);
+  setModelStatus(displayName, true);
 
   // Unload current model
   await unloadEngine();
@@ -185,22 +188,22 @@ async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
   const progressDiv = document.createElement('div');
   progressDiv.id = 'model-switch-progress';
   progressDiv.style.cssText = 'padding: var(--spacing-lg); text-align: center;';
-  progressDiv.innerHTML = `<p>Loading ${MODEL_INFO[newModel].name}...</p>`;
+  progressDiv.innerHTML = `<p>Loading ${displayName}...</p>`;
   if (chatMessagesContainer) {
     chatMessagesContainer.appendChild(progressDiv);
   }
 
   // Load new model
   try {
-    await initializeEngine(newModel, (progress) => {
+    await initializeEngine(newModelId, (progress) => {
       const progressText = progressDiv.querySelector('p');
       if (progressText) {
         progressText.textContent = `${progress.message} (${Math.round(progress.progress)}%)`;
       }
     });
 
-    currentModelVariant = newModel;
-    setModelStatus(MODEL_INFO[newModel].name, false);
+    currentModelId = newModelId;
+    setModelStatus(displayName, false);
 
     // Remove progress indicator
     progressDiv.remove();
@@ -368,22 +371,24 @@ function handleStopGeneration(): void {
  * Handle loading a model.
  */
 async function handleLoadModel(
-  model: ModelVariant,
-  cachedModels: Set<ModelVariant>,
+  modelId: string,
+  cachedModels: Set<string>,
   progressContainer: HTMLElement,
   buttonsState: { setButtonsState: (enabled: boolean, text: string) => void }
 ): Promise<void> {
   if (isLoading) return;
   isLoading = true;
 
-  const modelInfo = MODEL_INFO[model];
+  const modelInfo = getModelInfo(modelId);
+  const displayName = modelInfo?.displayName ?? modelId;
 
   // Check storage before loading if not cached
-  if (!cachedModels.has(model)) {
+  if (!cachedModels.has(modelId)) {
     const storage = await getStorageEstimate();
-    const requiredSpace = modelInfo.vramMB * 1024 * 1024 * 1.5;
-    if (storage.available < requiredSpace) {
-      alert(`Not enough storage space. Need ${modelInfo.size}, but only ${Math.round(storage.available / 1024 / 1024 / 1024)}GB available.`);
+    const requiredSpace = (modelInfo?.vramMB ?? 0) * 1024 * 1024 * 1.5;
+    if (requiredSpace > 0 && storage.available < requiredSpace) {
+      const sizeStr = modelInfo?.sizeGB ? `${modelInfo.sizeGB} GB` : 'the model';
+      alert(`Not enough storage space. Need ~${sizeStr}, but only ${Math.round(storage.available / 1024 / 1024 / 1024)}GB available.`);
       isLoading = false;
       return;
     }
@@ -392,7 +397,7 @@ async function handleLoadModel(
     buttonsState.setButtonsState(false, 'Loading...');
   }
 
-  setModelStatus(modelInfo.name, true);
+  setModelStatus(displayName, true);
 
   // Create progress bar
   progressContainer.innerHTML = '';
@@ -403,14 +408,14 @@ async function handleLoadModel(
   };
 
   try {
-    await initializeEngine(model, onProgress);
+    await initializeEngine(modelId, onProgress);
     hideProgressBar();
-    setModelStatus(modelInfo.name, false);
+    setModelStatus(displayName, false);
 
     // Show chat UI
     showChatUI();
 
-    logger.info(`Model ${model} loaded successfully`);
+    logger.info(`Model ${modelId} loaded successfully`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Model loading failed:', errorMessage);
@@ -505,15 +510,17 @@ async function init(): Promise<void> {
   createStorageStatus(mainContent);
 
   // Check which models are cached
-  const cachedModels = new Set<ModelVariant>();
-  for (const model of ['gemma3-1b', 'gemma3-4b', 'gemma3-12b', 'gemma3-27b'] as ModelVariant[]) {
-    const isCached = await checkModelCached(model);
-    if (isCached) cachedModels.add(model);
-  }
+  const catalog = getModelCatalog();
+  const cachedModels = new Set<string>();
+  await Promise.all(
+    catalog.map(async info => {
+      if (await checkModelCached(info.modelId)) cachedModels.add(info.modelId);
+    })
+  );
 
   // Create model selector
-  const modelSelector = createModelSelectorUI(cachedModels, (model) => {
-    currentModelVariant = model;
+  const modelSelector = createModelSelectorUI(cachedModels, (modelId) => {
+    currentModelId = modelId;
   });
   mainContent.appendChild(modelSelector);
 
@@ -527,7 +534,7 @@ async function init(): Promise<void> {
   mainContent.appendChild(buttonsContainer);
 
   // Update button text based on cache status
-  if (cachedModels.has(currentModelVariant)) {
+  if (cachedModels.has(currentModelId)) {
     setButtonsState(true, 'Load');
   } else {
     setButtonsState(true, 'Download');
@@ -538,12 +545,13 @@ async function init(): Promise<void> {
   const clearButton = document.getElementById('clear-button');
 
   loadButton?.addEventListener('click', () => {
-    handleLoadModel(currentModelVariant, cachedModels, progressContainer, { setButtonsState });
+    handleLoadModel(currentModelId, cachedModels, progressContainer, { setButtonsState });
   });
 
   clearButton?.addEventListener('click', async () => {
-    if (confirm(`Clear cache for ${MODEL_INFO[currentModelVariant].name}? You'll need to download it again next time.`)) {
-      await deleteCachedModel(currentModelVariant);
+    const info = getModelInfo(currentModelId);
+    if (confirm(`Clear cache for ${info?.displayName ?? currentModelId}? You'll need to download it again next time.`)) {
+      await deleteCachedModel(currentModelId);
       location.reload();
     }
   });

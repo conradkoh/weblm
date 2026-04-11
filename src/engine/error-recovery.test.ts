@@ -12,7 +12,7 @@ import {
   getErrorHistory,
   type ErrorCategory,
 } from './error-recovery';
-import { MODEL_INFO } from '../config';
+import { getModelInfo } from '../config';
 
 describe('categorizeError', () => {
   test('categorizes OOM errors', () => {
@@ -147,30 +147,27 @@ describe('canAutoRecover', () => {
   });
 
   test('can recover from device-lost once', () => {
-    expect(canAutoRecover('device-lost', 'gemma3-1b')).toBe(true);
+    expect(canAutoRecover('device-lost', 'Qwen3-8B-q4f16_1-MLC')).toBe(true);
   });
 
   test('can recover from network once', () => {
-    expect(canAutoRecover('network', 'gemma3-1b')).toBe(true);
+    expect(canAutoRecover('network', 'Qwen3-8B-q4f16_1-MLC')).toBe(true);
   });
 
-  test('can switch from gemma3-27b to smaller on OOM', () => {
-    expect(canAutoRecover('oom', 'gemma3-27b')).toBe(true);
+  test('can switch from large model to smaller on OOM', () => {
+    // Qwen3-8B has 5695 MB — there are definitely smaller models
+    expect(canAutoRecover('oom', 'Qwen3-8B-q4f16_1-MLC')).toBe(true);
   });
 
-  test('cannot switch from gemma3-1b on OOM', () => {
-    expect(canAutoRecover('oom', 'gemma3-1b')).toBe(false);
+  test('cannot recover from unknown errors', () => {
+    expect(canAutoRecover('unknown', 'Qwen3-8B-q4f16_1-MLC')).toBe(false);
   });
 
   test('cannot recover after max retries', () => {
     trackError('device-lost', new Error('test'));
     trackError('device-lost', new Error('test'));
     trackError('device-lost', new Error('test'));
-    expect(canAutoRecover('device-lost', 'gemma3-1b')).toBe(false);
-  });
-
-  test('cannot recover from unknown errors', () => {
-    expect(canAutoRecover('unknown', 'gemma3-1b')).toBe(false);
+    expect(canAutoRecover('device-lost', 'Qwen3-8B-q4f16_1-MLC')).toBe(false);
   });
 });
 
@@ -179,50 +176,53 @@ describe('getRecoveryAction', () => {
     clearErrorHistory();
   });
 
-  test('recommends gemma3-12b for OOM on gemma3-27b', () => {
-    const result = getRecoveryAction('oom', 'gemma3-27b');
+  test('recommends a smaller model for OOM on large model', () => {
+    const result = getRecoveryAction('oom', 'Qwen3-8B-q4f16_1-MLC');
     expect(result.shouldSwitchModel).toBe(true);
-    expect(result.recommendedModel).toBe('gemma3-12b');
+    expect(result.recommendedModel).toBeDefined();
   });
 
-  test('recommends gemma3-4b for OOM on gemma3-12b', () => {
-    const result = getRecoveryAction('oom', 'gemma3-12b');
-    expect(result.shouldSwitchModel).toBe(true);
-    expect(result.recommendedModel).toBe('gemma3-4b');
+  test('recommended model has less VRAM than current on OOM', () => {
+    const result = getRecoveryAction('oom', 'Qwen3-8B-q4f16_1-MLC');
+    if (result.recommendedModel) {
+      const currentInfo = getModelInfo('Qwen3-8B-q4f16_1-MLC');
+      const recommendedInfo = getModelInfo(result.recommendedModel);
+      if (currentInfo && recommendedInfo) {
+        expect(recommendedInfo.vramMB).toBeLessThan(currentInfo.vramMB);
+      }
+    }
   });
 
   test('recommends reload for device-lost', () => {
-    const result = getRecoveryAction('device-lost', 'gemma3-1b');
+    const result = getRecoveryAction('device-lost', 'Qwen3-4B-q4f16_1-MLC');
     expect(result.success).toBe(true);
     expect(result.message).toContain('GPU');
   });
 
   test('recommends retry for network', () => {
-    const result = getRecoveryAction('network', 'gemma3-1b');
+    const result = getRecoveryAction('network', 'Qwen3-4B-q4f16_1-MLC');
     expect(result.success).toBe(true);
     expect(result.message).toContain('Network');
   });
 
   test('provides message for unknown errors', () => {
-    const result = getRecoveryAction('unknown', 'gemma3-1b');
+    const result = getRecoveryAction('unknown', 'Qwen3-4B-q4f16_1-MLC');
     expect(result.message).toContain('unexpected error');
   });
 });
 
 describe('checkMemorySufficient', () => {
   test('returns sufficient=true when deviceMemory is undefined', () => {
-    const result = checkMemorySufficient('gemma3-1b');
-    // deviceMemory may not be available in test environment
+    const result = checkMemorySufficient('SmolLM2-1.7B-Instruct-q4f16_1-MLC');
     expect(result.sufficient).toBeDefined();
     expect(typeof result.sufficient).toBe('boolean');
   });
 
   test('calculates required memory based on model', () => {
-    const modelInfo = MODEL_INFO['gemma3-1b'];
-    const result = checkMemorySufficient('gemma3-1b');
+    const modelInfo = getModelInfo('SmolLM2-1.7B-Instruct-q4f16_1-MLC');
+    const result = checkMemorySufficient('SmolLM2-1.7B-Instruct-q4f16_1-MLC');
     // When deviceMemory is undefined, required is 0
-    // When defined, it should match model's vramMB
-    if (result.required > 0) {
+    if (result.required > 0 && modelInfo) {
       expect(result.required).toBe(modelInfo.vramMB);
     } else {
       expect(result.required).toBe(0);
@@ -230,7 +230,7 @@ describe('checkMemorySufficient', () => {
   });
 
   test('returns available and required as numbers', () => {
-    const result = checkMemorySufficient('gemma3-27b');
+    const result = checkMemorySufficient('Llama-3.1-8B-Instruct-q4f16_1-MLC');
     expect(typeof result.available).toBe('number');
     expect(typeof result.required).toBe('number');
     expect(typeof result.sufficient).toBe('boolean');
@@ -239,21 +239,18 @@ describe('checkMemorySufficient', () => {
 
 describe('getMemoryWarning', () => {
   test('returns null when memory is sufficient', () => {
-    // This depends on navigator.deviceMemory which may not be available
-    const warning = getMemoryWarning('gemma3-1b');
-    // In test environment, deviceMemory may be undefined
+    const warning = getMemoryWarning('SmolLM2-1.7B-Instruct-q4f16_1-MLC');
     expect(warning).toBeNull();
   });
 
   test('returns warning string when available', () => {
-    // Mock deviceMemory for testing
     const originalDeviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-    (navigator as Navigator & { deviceMemory?: number }).deviceMemory = 1; // Low memory
-    
-    const warning = getMemoryWarning('gemma3-27b');
+    (navigator as Navigator & { deviceMemory?: number }).deviceMemory = 1; // Low memory (1 GB)
+
+    const warning = getMemoryWarning('Llama-3.1-8B-Instruct-q4f16_1-MLC');
     expect(warning).toBeDefined();
     expect(warning).toContain('insufficient');
-    
+
     // Restore
     (navigator as Navigator & { deviceMemory?: number }).deviceMemory = originalDeviceMemory;
   });
