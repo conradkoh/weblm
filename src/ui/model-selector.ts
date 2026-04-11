@@ -24,7 +24,7 @@ export function createModelSelectorUI(
 
   let selectedModel: ModelVariant = DEFAULT_MODEL;
 
-  (['small', 'large'] as ModelVariant[]).forEach(model => {
+  (['small', 'medium', 'large'] as ModelVariant[]).forEach(model => {
     const info = MODEL_INFO[model];
     const isCached = cachedModels.has(model);
 

@@ -179,8 +179,14 @@ describe('getRecoveryAction', () => {
     clearErrorHistory();
   });
 
-  test('recommends small model for OOM on large', () => {
+  test('recommends medium model for OOM on large', () => {
     const result = getRecoveryAction('oom', 'large');
+    expect(result.shouldSwitchModel).toBe(true);
+    expect(result.recommendedModel).toBe('medium');
+  });
+
+  test('recommends small model for OOM on medium', () => {
+    const result = getRecoveryAction('oom', 'medium');
     expect(result.shouldSwitchModel).toBe(true);
     expect(result.recommendedModel).toBe('small');
   });

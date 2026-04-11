@@ -39,6 +39,7 @@ const MAX_RETRIES = 3;
 /** Memory thresholds for warnings (in MB) */
 const MEMORY_THRESHOLDS = {
   small: 3000, // 3GB minimum for small model
+  medium: 4000, // 4GB minimum for medium model
   large: 8000, // 8GB minimum for large model
 };
 
@@ -101,7 +102,7 @@ export function categorizeError(error: Error): ErrorCategory {
 export function getErrorMessage(category: ErrorCategory, originalError: Error): string {
   switch (category) {
     case 'oom':
-      return 'Not enough memory. Try closing other browser tabs or switching to the smaller model (Gemma 2 2B).';
+      return 'Not enough memory. Try closing other browser tabs or switching to a smaller model.';
     case 'device-lost':
       return 'The GPU encountered an error. This usually happens when the browser or system runs low on resources. Try refreshing the page.';
     case 'network':
@@ -156,7 +157,8 @@ export function canAutoRecover(category: ErrorCategory, currentModel: ModelVaria
 
   // For OOM errors, we can try switching to a smaller model
   if (category === 'oom' && recentCount < MAX_RETRIES) {
-    return currentModel === 'large'; // Can switch from large to small
+    // Can switch from large to medium, or from medium to small
+    return currentModel === 'large' || currentModel === 'medium';
   }
 
   // Network errors can be retried
@@ -174,13 +176,23 @@ export function getRecoveryAction(category: ErrorCategory, currentModel: ModelVa
   const success = canAutoRecover(category, currentModel);
   
   // For OOM, recommend smaller model
-  if (category === 'oom' && currentModel === 'large') {
-    return {
-      success,
-      message: getErrorMessage(category, new Error('OOM')),
-      shouldSwitchModel: true,
-      recommendedModel: 'small',
-    };
+  if (category === 'oom') {
+    if (currentModel === 'large') {
+      return {
+        success,
+        message: getErrorMessage(category, new Error('OOM')),
+        shouldSwitchModel: true,
+        recommendedModel: 'medium',
+      };
+    }
+    if (currentModel === 'medium') {
+      return {
+        success,
+        message: getErrorMessage(category, new Error('OOM')),
+        shouldSwitchModel: true,
+        recommendedModel: 'small',
+      };
+    }
   }
 
   // For device-lost, recommend reload
