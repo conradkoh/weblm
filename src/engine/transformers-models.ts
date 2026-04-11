@@ -11,8 +11,8 @@ import type { ModelInfo } from '../config';
 export interface TransformersModelRecord {
   /** HuggingFace model ID (e.g. "onnx-community/Qwen2.5-0.5B-Instruct") */
   hfModelId: string;
-  /** Metadata for the model catalog */
-  info: Omit<ModelInfo, 'modelId'>;
+  /** Metadata for the model catalog (runtime is always 'transformers.js') */
+  info: Omit<ModelInfo, 'modelId' | 'runtime'>;
 }
 
 /**

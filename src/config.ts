@@ -8,6 +8,7 @@
  */
 
 import { prebuiltAppConfig, type ModelRecord } from '@mlc-ai/web-llm';
+import { TRANSFORMERS_MODEL_RECORDS } from './engine/transformers-models';
 
 // ─────────────────────────────────────────────────────────────
 // Model families
@@ -41,7 +42,7 @@ export const MODEL_FAMILIES: ModelFamily[] = [
  * Extended model metadata on top of WebLLM's ModelRecord.
  */
 export interface ModelInfo {
-  /** WebLLM model_id (used as the canonical key) */
+  /** WebLLM model_id or HuggingFace model ID (used as the canonical key) */
   modelId: string;
   /** Human-friendly name, e.g. "Llama 3.2 3B Instruct" */
   displayName: string;
@@ -57,6 +58,8 @@ export interface ModelInfo {
   vramMB: number;
   /** Context window size in tokens */
   contextWindowSize: number;
+  /** Inference backend to use for this model */
+  runtime: 'webllm' | 'transformers.js';
   /** Highlighted as a top recommendation in the UI */
   recommended?: boolean;
   /** Capability tags, e.g. ['coding', 'math', 'reasoning', 'vision'] */
@@ -123,7 +126,9 @@ const CURATED: Record<string, Partial<ModelInfo>> = {
  * Detect model family from model_id.
  */
 function detectFamily(modelId: string): string {
-  const id = modelId.toLowerCase();
+  // For HuggingFace IDs like "onnx-community/Qwen2.5-0.5B-Instruct", use the repo name part
+  const name = modelId.includes('/') ? modelId.split('/').pop()! : modelId;
+  const id = name.toLowerCase();
   if (id.includes('deepseek'))     return 'deepseek';
   if (id.includes('smollm'))       return 'smollm';
   if (id.includes('qwen'))         return 'qwen';
@@ -251,6 +256,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     parameterSize: '1B',
     quantization: 'q4f16_1',
     contextWindowSize: 4096,
+    runtime: 'webllm' as const,
     recommended: true,
     tags: [],
   },
@@ -260,6 +266,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     parameterSize: '4B',
     quantization: 'q4f16_1',
     contextWindowSize: 4096,
+    runtime: 'webllm' as const,
     tags: [],
   },
   'gemma-3-12b-it-q4f16_1-MLC': {
@@ -268,6 +275,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     parameterSize: '12B',
     quantization: 'q4f16_1',
     contextWindowSize: 4096,
+    runtime: 'webllm' as const,
     tags: [],
   },
   'gemma-3-27b-it-q4f16_1-MLC': {
@@ -276,6 +284,7 @@ const GEMMA3_CURATED: Record<string, Partial<ModelInfo>> = {
     parameterSize: '27B',
     quantization: 'q4f16_1',
     contextWindowSize: 4096,
+    runtime: 'webllm' as const,
     tags: [],
   },
 };
@@ -302,7 +311,11 @@ function shouldExclude(record: ModelRecord): boolean {
 /**
  * Build a ModelInfo from a WebLLM ModelRecord + optional curated overrides.
  */
-function buildModelInfo(record: ModelRecord, curated?: Partial<ModelInfo>): ModelInfo {
+function buildModelInfo(
+  record: ModelRecord,
+  curated?: Partial<ModelInfo>,
+  runtime: 'webllm' | 'transformers.js' = 'webllm'
+): ModelInfo {
   const modelId = record.model_id;
   const vramMB = record.vram_required_MB ?? 0;
   const contextWindowSize = (record.overrides as { context_window_size?: number } | undefined)?.context_window_size ?? 4096;
@@ -316,6 +329,7 @@ function buildModelInfo(record: ModelRecord, curated?: Partial<ModelInfo>): Mode
     sizeGB:            estimateSizeGB(vramMB),
     vramMB,
     contextWindowSize,
+    runtime,
   };
 
   return { ...auto, ...CURATED[modelId], ...curated };
@@ -330,16 +344,26 @@ let _catalog: ModelInfo[] | null = null;
 function buildCatalog(): ModelInfo[] {
   const catalog: ModelInfo[] = [];
 
-  // Add all prebuilt models (filtered)
+  // Add all prebuilt WebLLM models (filtered)
   for (const record of prebuiltAppConfig.model_list) {
     if (!shouldExclude(record)) {
-      catalog.push(buildModelInfo(record));
+      catalog.push(buildModelInfo(record, undefined, 'webllm'));
     }
   }
 
-  // Add Gemma 3 custom models
+  // Add Gemma 3 custom WebLLM models
   for (const record of GEMMA3_MODEL_RECORDS) {
-    catalog.push(buildModelInfo(record, GEMMA3_CURATED[record.model_id]));
+    catalog.push(buildModelInfo(record, GEMMA3_CURATED[record.model_id], 'webllm'));
+  }
+
+  // Add Transformers.js models
+  for (const rec of TRANSFORMERS_MODEL_RECORDS) {
+    const info: ModelInfo = {
+      modelId: rec.hfModelId,
+      ...rec.info,
+      runtime: 'transformers.js',
+    };
+    catalog.push(info);
   }
 
   return catalog;

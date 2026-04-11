@@ -9,7 +9,7 @@
 
 import { prebuiltAppConfig, type MLCEngine, type InitProgressReport } from '@mlc-ai/web-llm';
 import { getModelInfo } from '../config';
-import { getEngineInstance } from './engine-factory';
+import { getEngineInstance, switchRuntimeForModel } from './engine-factory';
 import { WebLLMAdapter } from './webllm-adapter';
 import type { ProgressCallback } from './types';
 import type { ChatMessage } from '../types';
@@ -63,11 +63,13 @@ export async function deleteCachedModel(modelId: string): Promise<void> {
 
 /**
  * Initialize the engine with a specific model.
+ * Auto-detects runtime based on modelId and switches the singleton if needed.
  */
 export async function initializeEngine(
   modelId: string,
   onProgress?: ProgressCallback
 ): Promise<void> {
+  switchRuntimeForModel(modelId);
   return getEngineInstance().initialize(modelId, onProgress);
 }
 
