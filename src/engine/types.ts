@@ -5,35 +5,42 @@
  * and inference operations.
  */
 
+import type { ModelVariant } from '../config';
+
 /**
- * Supported Gemma 4 model variants.
+ * Re-export ModelVariant from config for convenience.
  */
-export type ModelVariant = 'gemma-4-e2b' | 'gemma-4-e4b';
+export type { ModelVariant };
 
 /**
  * Model loading state.
  */
 export type ModelState =
   | 'unloaded'
+  | 'checking'
   | 'loading'
   | 'ready'
   | 'error';
 
 /**
  * Model loading progress information.
+ * This wraps WebLLM's InitProgressReport.
  */
 export interface ModelProgress {
   /** Current loading phase */
-  phase: 'downloading' | 'compiling' | 'ready';
+  phase: 'downloading' | 'compiling' | 'loading' | 'ready';
   /** Progress percentage (0-100) */
   progress: number;
-  /** Loaded bytes (if downloading) */
-  loadedBytes?: number;
-  /** Total bytes (if downloading) */
-  totalBytes?: number;
   /** Human-readable status message */
   message: string;
+  /** Time elapsed in seconds */
+  timeElapsed?: number;
 }
+
+/**
+ * Progress callback for model loading.
+ */
+export type ProgressCallback = (progress: ModelProgress) => void;
 
 /**
  * Engine configuration options.

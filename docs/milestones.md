@@ -40,19 +40,19 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.2.0 — Model Loading
+### 0.2.0 — Model Loading ✅
 *Codename: "Bootstrap"*
 
 **Summary:** Enable model download with progress feedback and persistent caching so users only download once.
 
 **Requirements:**
-- [ ] One-click download of recommended Gemma 4 model (E2B variant)
-- [ ] Download progress bar showing percentage, bytes downloaded, and ETA
-- [ ] Model weights cached in IndexedDB for persistence across sessions
-- [ ] "Model Ready" status indicator when model is loaded
-- [ ] Error handling for failed/interrupted downloads with retry and resume support
-- [ ] Storage quota detection before download to prevent OOM
-- [ ] Clear feedback when storage is insufficient
+- [x] One-click download of recommended Gemma 4 model (E2B variant)
+- [x] Download progress bar showing percentage, bytes downloaded, and ETA
+- [x] Model weights cached in IndexedDB for persistence across sessions
+- [x] "Model Ready" status indicator when model is loaded
+- [x] Error handling for failed/interrupted downloads with retry and resume support
+- [x] Storage quota detection before download to prevent OOM
+- [x] Clear feedback when storage is insufficient
 
 **Acceptance Criteria:**
 - Clicking "Download Model" initiates download with visible progress
@@ -63,6 +63,8 @@ These are the top user priorities that must be addressed prominently:
 - Subsequent app loads show TTFT < 500ms when model is cached
 
 **Dependencies:** 0.1.0 — requires foundation infrastructure
+
+**✅ Completed: 2025-04-11 UTC**
 
 ---
 

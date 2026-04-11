@@ -9,17 +9,40 @@
  */
 
 /**
- * WebLLM model identifiers for Gemma 4 variants.
+ * Available model variants with their WebLLM model IDs.
+ * 
+ * Note: Using Gemma 2 models as Gemma 4 is not yet available in WebLLM's prebuilt config.
  */
 export const MODEL_IDS = {
-  'gemma-4-e2b': 'gemma-4-2b-it-q4f16_1-MLC',
-  'gemma-4-e4b': 'gemma-4-4b-it-q4f16_1-MLC',
+  small: 'gemma-2-2b-it-q4f16_1-MLC',
+  large: 'gemma-2-9b-it-q4f16_1-MLC',
 } as const;
 
 /**
- * Default model to load.
+ * Model variant type.
  */
-export const DEFAULT_MODEL = 'gemma-4-e2b' as const;
+export type ModelVariant = keyof typeof MODEL_IDS;
+
+/**
+ * Default model to load (smaller model recommended for most users).
+ */
+export const DEFAULT_MODEL: ModelVariant = 'small';
+
+/**
+ * Model metadata for display purposes.
+ */
+export const MODEL_INFO: Record<ModelVariant, { name: string; size: string; vramMB: number }> = {
+  small: {
+    name: 'Gemma 2 2B (Quantized)',
+    size: '~1.9 GB download',
+    vramMB: 1900,
+  },
+  large: {
+    name: 'Gemma 2 9B (Quantized)',
+    size: '~6.4 GB download',
+    vramMB: 6400,
+  },
+};
 
 /**
  * Default generation parameters.
@@ -57,11 +80,11 @@ export const UI_CONFIG = {
 } as const;
 
 /**
- * Memory thresholds for model selection (in bytes).
+ * Memory thresholds for model selection (in MB).
  */
 export const MEMORY_THRESHOLDS = {
-  /** Minimum memory for E2B model */
-  minE2B: 3 * 1024 * 1024 * 1024, // 3GB
-  /** Minimum memory for E4B model */
-  minE4B: 5 * 1024 * 1024 * 1024, // 5GB
+  /** Minimum available memory for small model */
+  minSmall: 3000, // 3GB
+  /** Minimum available memory for large model */
+  minLarge: 8000, // 8GB
 } as const;

@@ -230,6 +230,196 @@ export function injectGlobalStyles(): void {
       color: var(--color-text-secondary);
       margin: var(--spacing-xs) 0;
     }
+
+    /* Button styles */
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-size: var(--font-size-base);
+      font-weight: 500;
+      font-family: inherit;
+      line-height: 1.5;
+      color: white;
+      background-color: var(--color-primary);
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+
+    .button:hover {
+      background-color: #4338ca;
+    }
+
+    .button:active {
+      transform: scale(0.98);
+    }
+
+    .button:disabled {
+      background-color: var(--color-text-secondary);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .button-secondary {
+      background-color: var(--color-surface);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+    }
+
+    .button-secondary:hover {
+      background-color: var(--color-border);
+    }
+
+    .button-danger {
+      background-color: var(--color-error);
+    }
+
+    .button-danger:hover {
+      background-color: #dc2626;
+    }
+
+    /* Progress bar styles */
+    .progress-container {
+      width: 100%;
+      max-width: 500px;
+      margin-top: var(--spacing-lg);
+      padding: var(--spacing-lg);
+      background-color: var(--color-surface);
+      border-radius: var(--border-radius);
+      border: 1px solid var(--color-border);
+    }
+
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .progress-phase {
+      font-size: var(--font-size-sm);
+      color: var(--color-text);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .progress-percent {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-primary);
+      margin-left: var(--spacing-sm);
+    }
+
+    .progress-bar-outer {
+      width: 100%;
+      height: 8px;
+      background-color: var(--color-border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar-inner {
+      height: 100%;
+      background-color: var(--color-primary);
+      border-radius: 4px;
+      transition: width 0.2s ease;
+    }
+
+    .progress-time {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+      margin-top: var(--spacing-sm);
+    }
+
+    .progress-error {
+      margin-top: var(--spacing-md);
+      padding: var(--spacing-md);
+      background-color: #fef2f2;
+      border: 1px solid var(--color-error);
+      border-radius: var(--border-radius);
+    }
+
+    .progress-error .error-message {
+      margin: 0 0 var(--spacing-sm) 0;
+      padding: 0;
+      background: none;
+      border: none;
+      color: var(--color-error);
+    }
+
+    .retry-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      font-family: inherit;
+      color: var(--color-error);
+      background-color: white;
+      border: 1px solid var(--color-error);
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .retry-button:hover {
+      background-color: #fef2f2;
+    }
+
+    /* Model selector */
+    .model-selector {
+      margin-top: var(--spacing-lg);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .model-option {
+      display: flex;
+      flex-direction: column;
+      padding: var(--spacing-md);
+      border: 2px solid var(--color-border);
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .model-option:hover {
+      border-color: var(--color-primary);
+      background-color: var(--color-surface);
+    }
+
+    .model-option.selected {
+      border-color: var(--color-primary);
+      background-color: #eef2ff;
+    }
+
+    .model-option-name {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .model-option-info {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+      margin-top: var(--spacing-xs);
+    }
+
+    .model-option-status {
+      font-size: var(--font-size-sm);
+      color: var(--color-success);
+      margin-top: var(--spacing-xs);
+    }
   `;
 
   document.head.appendChild(styleElement);
