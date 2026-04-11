@@ -47,7 +47,8 @@ export async function checkWebGPUSupport(): Promise<WebGPUCapabilities> {
     }
 
     // Get adapter info and limits
-    const info = await adapter.requestAdapterInfo();
+    // Note: requestAdapterInfo() was deprecated; modern browsers use adapter.info property
+    const info = adapter.info ?? (typeof adapter.requestAdapterInfo === 'function' ? await adapter.requestAdapterInfo() : null);
     const limits = adapter.limits;
     
     // Estimate available memory based on buffer limits

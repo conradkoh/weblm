@@ -28,7 +28,10 @@ interface GPUAdapterInfo {
 
 interface GPUAdapter {
   readonly limits: GPUSupportedLimits;
-  requestAdapterInfo(): Promise<GPUAdapterInfo>;
+  /** Modern property (replaces deprecated requestAdapterInfo()) */
+  readonly info?: GPUAdapterInfo;
+  /** @deprecated Use adapter.info instead */
+  requestAdapterInfo?(): Promise<GPUAdapterInfo>;
   requestDevice(): Promise<GPUDevice>;
   readonly features: Set<string>;
   readonly isFallbackAdapter: boolean;
