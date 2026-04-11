@@ -495,19 +495,27 @@ async function init(): Promise<void> {
     return;
   }
 
-  // Show title
-  const title = document.createElement('h1');
-  title.className = 'title';
-  title.textContent = 'WebLM — Local AI Chat';
-  mainContent.appendChild(title);
+  // Show launcher screen
+  mainContent.className = 'launcher-screen';
 
-  const description = document.createElement('p');
-  description.className = 'description';
-  description.textContent = 'A fully local, privacy-first AI chat running entirely in your browser.';
-  mainContent.appendChild(description);
+  const launcherCard = document.createElement('div');
+  launcherCard.className = 'launcher-card';
 
-  // Show storage status
-  createStorageStatus(mainContent);
+  // Hero
+  const hero = document.createElement('div');
+  hero.className = 'launcher-hero';
+  hero.innerHTML = `
+    <div class="launcher-logo">🧠</div>
+    <h1 class="launcher-title">WebLM</h1>
+    <p class="launcher-subtitle">Local AI Chat — Private &amp; Fast</p>
+  `;
+  launcherCard.appendChild(hero);
+
+  // Storage status (small, unobtrusive)
+  const storageDiv = document.createElement('div');
+  storageDiv.className = 'launcher-storage';
+  launcherCard.appendChild(storageDiv);
+  getStorageStatus().then(status => { storageDiv.textContent = status; });
 
   // Check which models are cached
   const catalog = getModelCatalog();
@@ -521,23 +529,31 @@ async function init(): Promise<void> {
   // Create model selector
   const modelSelector = createModelSelectorUI(cachedModels, (modelId) => {
     currentModelId = modelId;
+    // Update button text when selection changes
+    if (cachedModels.has(modelId)) {
+      setButtonsState(true, '✓ Cached — Load Instantly');
+    } else {
+      setButtonsState(true, 'Download & Load');
+    }
   });
-  mainContent.appendChild(modelSelector);
+  launcherCard.appendChild(modelSelector);
 
   // Create progress container (hidden initially)
   const progressContainer = document.createElement('div');
   progressContainer.id = 'progress-wrapper';
-  mainContent.appendChild(progressContainer);
+  launcherCard.appendChild(progressContainer);
 
   // Create load buttons
   const { container: buttonsContainer, setButtonsState } = createLoadButtons();
-  mainContent.appendChild(buttonsContainer);
+  launcherCard.appendChild(buttonsContainer);
 
-  // Update button text based on cache status
+  mainContent.appendChild(launcherCard);
+
+  // Update button text based on initial cache status
   if (cachedModels.has(currentModelId)) {
-    setButtonsState(true, 'Load');
+    setButtonsState(true, '✓ Cached — Load Instantly');
   } else {
-    setButtonsState(true, 'Download');
+    setButtonsState(true, 'Download & Load');
   }
 
   // Set up load button click handler
@@ -574,19 +590,6 @@ async function init(): Promise<void> {
   });
 
   logger.info('initialization complete');
-}
-
-/**
- * Create storage status element.
- */
-function createStorageStatus(container: HTMLElement): void {
-  const statusDiv = document.createElement('p');
-  statusDiv.style.cssText = 'color: var(--color-text-secondary); margin-top: var(--spacing-sm); font-size: var(--font-size-sm);';
-  container.appendChild(statusDiv);
-
-  getStorageStatus().then(status => {
-    statusDiv.textContent = status;
-  });
 }
 
 // Start the application

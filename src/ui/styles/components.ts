@@ -536,4 +536,181 @@ export const componentStyles = `
         transform: rotate(360deg);
       }
     }
+
+    /* ─── Launcher screen ──────────────────────────────── */
+
+    .launcher-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100%;
+      padding: var(--spacing-xl) var(--spacing-lg);
+    }
+
+    .launcher-card {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-lg);
+    }
+
+    .launcher-hero {
+      text-align: center;
+      padding-bottom: var(--spacing-sm);
+    }
+
+    .launcher-logo {
+      font-size: 3rem;
+      line-height: 1;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .launcher-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--color-text);
+      margin: 0 0 var(--spacing-xs) 0;
+    }
+
+    .launcher-subtitle {
+      font-size: var(--font-size-base);
+      color: var(--color-text-secondary);
+      margin: 0;
+    }
+
+    .launcher-storage {
+      text-align: center;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+      opacity: 0.8;
+      margin-top: calc(-1 * var(--spacing-md));
+    }
+
+    /* Selector within launcher */
+    .launcher-selector {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .launcher-select-label {
+      font-weight: 600;
+      color: var(--color-text);
+      font-size: var(--font-size-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .launcher-select {
+      width: 100%;
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background-color: var(--color-surface);
+      border: 2px solid var(--color-border);
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      appearance: auto;
+      transition: border-color 0.15s ease;
+    }
+
+    .launcher-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    .launcher-select:hover {
+      border-color: var(--color-primary);
+    }
+
+    /* Detail panel */
+    .launcher-detail-panel {
+      min-height: 80px;
+      padding: var(--spacing-md);
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--border-radius);
+      font-size: var(--font-size-sm);
+    }
+
+    .launcher-detail-placeholder {
+      color: var(--color-text-secondary);
+      text-align: center;
+      margin: 0;
+      padding: var(--spacing-sm) 0;
+    }
+
+    .launcher-detail-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+    }
+
+    .launcher-detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+
+    .launcher-detail-label {
+      color: var(--color-text-secondary);
+      flex-shrink: 0;
+    }
+
+    .launcher-detail-value {
+      color: var(--color-text);
+      font-weight: 500;
+      text-align: right;
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .launcher-family-desc {
+      font-style: italic;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+    }
+
+    .launcher-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background-color: var(--color-primary);
+      color: white;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .launcher-cached-row {
+      margin-top: var(--spacing-xs);
+    }
+
+    .launcher-cached-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      background-color: var(--color-success);
+      color: white;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Load button */
+    .launcher-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .launcher-load-btn {
+      width: 100%;
+      padding: var(--spacing-md) var(--spacing-lg);
+      font-size: var(--font-size-base);
+      font-weight: 600;
+    }
 `;
