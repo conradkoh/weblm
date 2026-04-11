@@ -506,10 +506,10 @@ async function init(): Promise<void> {
 
   // Check which models are cached
   const cachedModels = new Set<ModelVariant>();
-  const smallCached = await checkModelCached('small');
-  const largeCached = await checkModelCached('large');
-  if (smallCached) cachedModels.add('small');
-  if (largeCached) cachedModels.add('large');
+  for (const model of ['gemma3-1b', 'gemma3-4b', 'gemma3-12b', 'gemma3-27b'] as ModelVariant[]) {
+    const isCached = await checkModelCached(model);
+    if (isCached) cachedModels.add(model);
+  }
 
   // Create model selector
   const modelSelector = createModelSelectorUI(cachedModels, (model) => {

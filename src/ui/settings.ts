@@ -208,26 +208,32 @@ async function populateModelList(): Promise<void> {
   const currentModel = getCurrentModel();
   const cachedModels = new Set<ModelVariant>();
 
-  // Check cache status
-  const smallCached = await isModelCached('small');
-  const largeCached = await isModelCached('large');
-  if (smallCached) cachedModels.add('small');
-  if (largeCached) cachedModels.add('large');
+  // Check cache status for all models
+  for (const model of ['gemma3-1b', 'gemma3-4b', 'gemma3-12b', 'gemma3-27b'] as ModelVariant[]) {
+    const isCached = await isModelCached(model);
+    if (isCached) cachedModels.add(model);
+  }
 
-  // Create model cards
-  (['small', 'large'] as ModelVariant[]).forEach(model => {
+  // Create model cards (import needed)
+  const { MODEL_VARIANTS } = await import('../config');
+  MODEL_VARIANTS.forEach(model => {
     const info = MODEL_INFO[model];
     const isCached = cachedModels.has(model);
     const isCurrent = currentModel === model;
+    const hasWasm = info.hasWasm;
 
     const card = document.createElement('div');
     card.className = 'model-card';
     if (isCurrent) card.classList.add('current');
     if (isCached) card.classList.add('cached');
+    if (!hasWasm) card.classList.add('warning');
+
+    const warningIcon = !hasWasm ? ' ⚠️' : '';
+    const warningText = !hasWasm ? ' (WASM pending)' : '';
 
     card.innerHTML = `
       <div class="model-card-header">
-        <span class="model-name">${info.name}</span>
+        <span class="model-name">${info.name}${warningText}${warningIcon}</span>
         ${isCurrent ? '<span class="model-badge current-badge">Loaded</span>' : ''}
         ${isCached && !isCurrent ? '<span class="model-badge cached-badge">Cached</span>' : ''}
       </div>
@@ -237,7 +243,8 @@ async function populateModelList(): Promise<void> {
       </div>
       <div class="model-card-actions">
         ${isCurrent ? '<span class="model-action-label">Currently loaded</span>' : ''}
-        ${!isCurrent ? `<button class="button model-switch-btn" data-model="${model}">Switch to this model</button>` : ''}
+        ${!isCurrent && hasWasm ? `<button class="button model-switch-btn" data-model="${model}">Switch to this model</button>` : ''}
+        ${!hasWasm ? '<span class="model-action-label warning">Not yet available</span>' : ''}
         ${isCached && !isCurrent ? `<button class="button button-secondary model-clear-btn" data-model="${model}">Clear cache</button>` : ''}
       </div>
     `;
@@ -301,17 +308,23 @@ function updateMemoryInfo(): void {
   const memoryMB = storedMemory ? parseInt(storedMemory, 10) : 0;
 
   let recommendation = '';
-  let recommendedModel: ModelVariant = 'small';
+  let recommendedModel: ModelVariant = 'gemma3-1b';
 
   if (memoryMB < 2000) {
-    recommendation = '⚠️ Low memory detected. The small model is recommended. Performance may be limited.';
-    recommendedModel = 'small';
-  } else if (memoryMB < 4000) {
-    recommendation = '✓ The small model (Gemma 2 2B) is recommended for your available memory.';
-    recommendedModel = 'small';
+    recommendation = '⚠️ Low memory detected. The smallest model (Gemma 3 1B) is recommended. Performance may be limited.';
+    recommendedModel = 'gemma3-1b';
+  } else if (memoryMB < 5000) {
+    recommendation = '✓ The 1B model is recommended for your available memory.';
+    recommendedModel = 'gemma3-1b';
+  } else if (memoryMB < 10000) {
+    recommendation = '✓ You can run the 4B model. Consider starting with the 1B for faster responses.';
+    recommendedModel = 'gemma3-4b';
+  } else if (memoryMB < 20000) {
+    recommendation = '✓ You can run up to the 12B model. The 4B model offers good performance.';
+    recommendedModel = 'gemma3-12b';
   } else {
-    recommendation = '✓ You have enough memory for either model. The large model offers better quality.';
-    recommendedModel = 'large';
+    recommendation = '✓ You have enough memory for all models. The 27B model offers the best quality.';
+    recommendedModel = 'gemma3-27b';
   }
 
   memoryInfo.innerHTML = `

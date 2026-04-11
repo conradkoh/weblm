@@ -13,14 +13,14 @@ import type { ModelRecord } from '@mlc-ai/web-llm';
 /**
  * Available model variants with their WebLLM model IDs.
  *
- * - small: Gemma 3 1B (custom model config)
- * - medium: Gemma 4 E2B (experimental, custom model config)
- * - large: Gemma 2 9B (prebuilt config)
+ * All Gemma 3 models require custom model records.
+ * Only the 1B model has a verified WASM; others show a warning in UI.
  */
 export const MODEL_IDS = {
-  small: 'gemma-3-1b-it-q4f16_1-MLC',
-  medium: 'gemma-4-E2B-it-q4f16_1-MLC',
-  large: 'gemma-2-9b-it-q4f16_1-MLC',
+  'gemma3-1b': 'gemma-3-1b-it-q4f16_1-MLC',
+  'gemma3-4b': 'gemma-3-4b-it-q4f16_1-MLC',
+  'gemma3-12b': 'gemma-3-12b-it-q4f16_1-MLC',
+  'gemma3-27b': 'gemma-3-27b-it-q4f16_1-MLC',
 } as const;
 
 /**
@@ -29,28 +29,37 @@ export const MODEL_IDS = {
 export type ModelVariant = keyof typeof MODEL_IDS;
 
 /**
- * Default model to load (smaller model recommended for most users).
+ * Default model to load (only model with verified WASM).
  */
-export const DEFAULT_MODEL: ModelVariant = 'small';
+export const DEFAULT_MODEL: ModelVariant = 'gemma3-1b';
 
 /**
  * Model metadata for display purposes.
  */
-export const MODEL_INFO: Record<ModelVariant, { name: string; size: string; vramMB: number }> = {
-  small: {
-    name: 'Gemma 3 1B (Quantized)',
+export const MODEL_INFO: Record<ModelVariant, { name: string; size: string; vramMB: number; hasWasm: boolean }> = {
+  'gemma3-1b': {
+    name: 'Gemma 3 1B',
     size: '~0.9 GB download',
     vramMB: 1200,
+    hasWasm: true,
   },
-  medium: {
-    name: 'Gemma 4 E2B (Experimental)',
-    size: '~1.5 GB download',
-    vramMB: 2300,
+  'gemma3-4b': {
+    name: 'Gemma 3 4B',
+    size: '~3.0 GB download',
+    vramMB: 3000,
+    hasWasm: false,
   },
-  large: {
-    name: 'Gemma 2 9B (Quantized)',
-    size: '~6.4 GB download',
-    vramMB: 6400,
+  'gemma3-12b': {
+    name: 'Gemma 3 12B',
+    size: '~8.0 GB download',
+    vramMB: 8000,
+    hasWasm: false,
+  },
+  'gemma3-27b': {
+    name: 'Gemma 3 27B',
+    size: '~16.0 GB download',
+    vramMB: 16000,
+    hasWasm: false,
   },
 };
 
@@ -92,20 +101,18 @@ export const UI_CONFIG = {
 /**
  * Memory thresholds for model selection (in MB).
  */
-export const MEMORY_THRESHOLDS = {
-  /** Minimum available memory for small model */
-  minSmall: 3000, // 3GB
-  /** Minimum available memory for medium model */
-  minMedium: 4000, // 4GB
-  /** Minimum available memory for large model */
-  minLarge: 8000, // 8GB
-} as const;
+export const MEMORY_THRESHOLDS: Record<ModelVariant, number> = {
+  'gemma3-1b': 2000,
+  'gemma3-4b': 5000,
+  'gemma3-12b': 10000,
+  'gemma3-27b': 20000,
+};
 
 /**
  * Custom model records for models not in WebLLM's prebuilt config.
  *
- * - Gemma 3 1B: Custom record for the small model
- * - Gemma 4 E2B: Experimental community-compiled model
+ * Gemma 3 models require custom records. Only 1B has a working WASM;
+ * other models have empty model_lib and will show a warning in UI.
  */
 export const CUSTOM_MODEL_RECORDS: ModelRecord[] = [
   {
@@ -120,10 +127,32 @@ export const CUSTOM_MODEL_RECORDS: ModelRecord[] = [
     },
   },
   {
-    model: 'https://huggingface.co/welcoma/gemma-4-E2B-it-q4f16_1-MLC',
-    model_id: 'gemma-4-E2B-it-q4f16_1-MLC',
-    model_lib: 'https://huggingface.co/welcoma/gemma-4-E2B-it-q4f16_1-MLC/resolve/main/libs/gemma-4-E2B-it-q4f16_1-MLC-webgpu.wasm',
-    vram_required_MB: 2300,
+    model: 'https://huggingface.co/mlc-ai/gemma-3-4b-it-q4f16_1-MLC',
+    model_id: 'gemma-3-4b-it-q4f16_1-MLC',
+    model_lib: '', // WASM not yet available
+    vram_required_MB: 3000,
+    low_resource_required: false,
+    required_features: ['shader-f16'],
+    overrides: {
+      context_window_size: 4096,
+    },
+  },
+  {
+    model: 'https://huggingface.co/mlc-ai/gemma-3-12b-it-q4f16_1-MLC',
+    model_id: 'gemma-3-12b-it-q4f16_1-MLC',
+    model_lib: '', // WASM not yet available
+    vram_required_MB: 8000,
+    low_resource_required: false,
+    required_features: ['shader-f16'],
+    overrides: {
+      context_window_size: 4096,
+    },
+  },
+  {
+    model: 'https://huggingface.co/mlc-ai/gemma-3-27b-it-q4f16_1-MLC',
+    model_id: 'gemma-3-27b-it-q4f16_1-MLC',
+    model_lib: '', // WASM not yet available
+    vram_required_MB: 16000,
     low_resource_required: false,
     required_features: ['shader-f16'],
     overrides: {
@@ -131,3 +160,16 @@ export const CUSTOM_MODEL_RECORDS: ModelRecord[] = [
     },
   },
 ];
+
+/**
+ * Coming soon models (displayed in UI but not selectable).
+ */
+export const COMING_SOON_MODELS = [
+  { name: 'Gemma 4 E2B', status: 'Coming Soon' },
+  { name: 'Gemma 4 E4B', status: 'Coming Soon' },
+];
+
+/**
+ * Model variant values for iteration.
+ */
+export const MODEL_VARIANTS: ModelVariant[] = ['gemma3-1b', 'gemma3-4b', 'gemma3-12b', 'gemma3-27b'];

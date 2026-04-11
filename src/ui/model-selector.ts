@@ -5,9 +5,10 @@
  * - Create model selection interface
  * - Handle model option rendering
  * - Manage model selection state
+ * - Display "Coming Soon" models
  */
 
-import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from '../config';
+import { MODEL_INFO, DEFAULT_MODEL, MODEL_VARIANTS, COMING_SOON_MODELS, type ModelVariant } from '../config';
 
 /**
  * Create the model selection UI.
@@ -24,19 +25,27 @@ export function createModelSelectorUI(
 
   let selectedModel: ModelVariant = DEFAULT_MODEL;
 
-  (['small', 'medium', 'large'] as ModelVariant[]).forEach(model => {
+  // Render available models
+  MODEL_VARIANTS.forEach(model => {
     const info = MODEL_INFO[model];
     const isCached = cachedModels.has(model);
+    const hasWarning = !info.hasWasm;
 
     const optionDiv = document.createElement('div');
     optionDiv.className = 'model-option';
+    if (hasWarning) {
+      optionDiv.classList.add('model-option-warning');
+    }
     optionDiv.setAttribute('data-model', model);
     optionDiv.setAttribute('role', 'radio');
     optionDiv.setAttribute('aria-checked', 'false');
     optionDiv.setAttribute('tabindex', '0');
 
+    const warningIcon = hasWarning ? ' ⚠️' : '';
+    const warningText = hasWarning ? ' (WASM pending)' : '';
+
     optionDiv.innerHTML = `
-      <span class="model-option-name">${info.name}</span>
+      <span class="model-option-name">${info.name}${warningText}${warningIcon}</span>
       <span class="model-option-info">${info.size}</span>
       ${isCached ? '<span class="model-option-status">✓ Cached locally</span>' : ''}
     `;
@@ -63,12 +72,30 @@ export function createModelSelectorUI(
     container.appendChild(optionDiv);
   });
 
+  // Add "Coming Soon" section
+  const comingSoonSection = document.createElement('div');
+  comingSoonSection.className = 'model-coming-soon';
+  comingSoonSection.innerHTML = '<h4 style="margin-top: var(--spacing-lg); color: var(--text-secondary);">Coming Soon</h4>';
+
+  COMING_SOON_MODELS.forEach(model => {
+    const comingSoonDiv = document.createElement('div');
+    comingSoonDiv.className = 'model-option model-option-disabled';
+    comingSoonDiv.setAttribute('aria-disabled', 'true');
+    comingSoonDiv.innerHTML = `
+      <span class="model-option-name" style="color: var(--text-secondary);">${model.name}</span>
+      <span class="model-option-info" style="color: var(--text-secondary);">${model.status}</span>
+    `;
+    comingSoonSection.appendChild(comingSoonDiv);
+  });
+
+  container.appendChild(comingSoonSection);
+
   // Pre-select default or cached
-  if (cachedModels.has('small')) {
-    const smallOption = container.querySelector('[data-model="small"]');
-    smallOption?.classList.add('selected');
-    smallOption?.setAttribute('aria-checked', 'true');
-    selectedModel = 'small';
+  if (cachedModels.has(DEFAULT_MODEL)) {
+    const defaultOption = container.querySelector(`[data-model="${DEFAULT_MODEL}"]`);
+    defaultOption?.classList.add('selected');
+    defaultOption?.setAttribute('aria-checked', 'true');
+    selectedModel = DEFAULT_MODEL;
   } else {
     const defaultOption = container.querySelector(`[data-model="${DEFAULT_MODEL}"]`);
     defaultOption?.classList.add('selected');

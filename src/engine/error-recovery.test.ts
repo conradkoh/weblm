@@ -147,30 +147,30 @@ describe('canAutoRecover', () => {
   });
 
   test('can recover from device-lost once', () => {
-    expect(canAutoRecover('device-lost', 'small')).toBe(true);
+    expect(canAutoRecover('device-lost', 'gemma3-1b')).toBe(true);
   });
 
   test('can recover from network once', () => {
-    expect(canAutoRecover('network', 'small')).toBe(true);
+    expect(canAutoRecover('network', 'gemma3-1b')).toBe(true);
   });
 
-  test('can switch from large to small on OOM', () => {
-    expect(canAutoRecover('oom', 'large')).toBe(true);
+  test('can switch from gemma3-27b to smaller on OOM', () => {
+    expect(canAutoRecover('oom', 'gemma3-27b')).toBe(true);
   });
 
-  test('cannot switch from small on OOM', () => {
-    expect(canAutoRecover('oom', 'small')).toBe(false);
+  test('cannot switch from gemma3-1b on OOM', () => {
+    expect(canAutoRecover('oom', 'gemma3-1b')).toBe(false);
   });
 
   test('cannot recover after max retries', () => {
     trackError('device-lost', new Error('test'));
     trackError('device-lost', new Error('test'));
     trackError('device-lost', new Error('test'));
-    expect(canAutoRecover('device-lost', 'small')).toBe(false);
+    expect(canAutoRecover('device-lost', 'gemma3-1b')).toBe(false);
   });
 
   test('cannot recover from unknown errors', () => {
-    expect(canAutoRecover('unknown', 'small')).toBe(false);
+    expect(canAutoRecover('unknown', 'gemma3-1b')).toBe(false);
   });
 });
 
@@ -179,58 +179,58 @@ describe('getRecoveryAction', () => {
     clearErrorHistory();
   });
 
-  test('recommends medium model for OOM on large', () => {
-    const result = getRecoveryAction('oom', 'large');
+  test('recommends gemma3-12b for OOM on gemma3-27b', () => {
+    const result = getRecoveryAction('oom', 'gemma3-27b');
     expect(result.shouldSwitchModel).toBe(true);
-    expect(result.recommendedModel).toBe('medium');
+    expect(result.recommendedModel).toBe('gemma3-12b');
   });
 
-  test('recommends small model for OOM on medium', () => {
-    const result = getRecoveryAction('oom', 'medium');
+  test('recommends gemma3-4b for OOM on gemma3-12b', () => {
+    const result = getRecoveryAction('oom', 'gemma3-12b');
     expect(result.shouldSwitchModel).toBe(true);
-    expect(result.recommendedModel).toBe('small');
+    expect(result.recommendedModel).toBe('gemma3-4b');
   });
 
   test('recommends reload for device-lost', () => {
-    const result = getRecoveryAction('device-lost', 'small');
+    const result = getRecoveryAction('device-lost', 'gemma3-1b');
     expect(result.success).toBe(true);
     expect(result.message).toContain('GPU');
   });
 
   test('recommends retry for network', () => {
-    const result = getRecoveryAction('network', 'small');
+    const result = getRecoveryAction('network', 'gemma3-1b');
     expect(result.success).toBe(true);
     expect(result.message).toContain('Network');
   });
 
   test('provides message for unknown errors', () => {
-    const result = getRecoveryAction('unknown', 'small');
+    const result = getRecoveryAction('unknown', 'gemma3-1b');
     expect(result.message).toContain('unexpected error');
   });
 });
 
 describe('checkMemorySufficient', () => {
   test('returns sufficient=true when deviceMemory is undefined', () => {
-    const result = checkMemorySufficient('small');
+    const result = checkMemorySufficient('gemma3-1b');
     // deviceMemory may not be available in test environment
     expect(result.sufficient).toBeDefined();
     expect(typeof result.sufficient).toBe('boolean');
   });
 
   test('calculates required memory based on model', () => {
-    const smallInfo = MODEL_INFO['small'];
-    const result = checkMemorySufficient('small');
+    const modelInfo = MODEL_INFO['gemma3-1b'];
+    const result = checkMemorySufficient('gemma3-1b');
     // When deviceMemory is undefined, required is 0
     // When defined, it should match model's vramMB
     if (result.required > 0) {
-      expect(result.required).toBe(smallInfo.vramMB);
+      expect(result.required).toBe(modelInfo.vramMB);
     } else {
       expect(result.required).toBe(0);
     }
   });
 
   test('returns available and required as numbers', () => {
-    const result = checkMemorySufficient('large');
+    const result = checkMemorySufficient('gemma3-27b');
     expect(typeof result.available).toBe('number');
     expect(typeof result.required).toBe('number');
     expect(typeof result.sufficient).toBe('boolean');
@@ -240,7 +240,7 @@ describe('checkMemorySufficient', () => {
 describe('getMemoryWarning', () => {
   test('returns null when memory is sufficient', () => {
     // This depends on navigator.deviceMemory which may not be available
-    const warning = getMemoryWarning('small');
+    const warning = getMemoryWarning('gemma3-1b');
     // In test environment, deviceMemory may be undefined
     expect(warning).toBeNull();
   });
@@ -250,7 +250,7 @@ describe('getMemoryWarning', () => {
     const originalDeviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
     (navigator as Navigator & { deviceMemory?: number }).deviceMemory = 1; // Low memory
     
-    const warning = getMemoryWarning('large');
+    const warning = getMemoryWarning('gemma3-27b');
     expect(warning).toBeDefined();
     expect(warning).toContain('insufficient');
     

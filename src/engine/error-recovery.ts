@@ -8,7 +8,7 @@
  * - Provide user-friendly error messages
  */
 
-import { MODEL_INFO, type ModelVariant } from '../config';
+import { MODEL_INFO, MODEL_VARIANTS, type ModelVariant } from '../config';
 import { logger } from '../logger';
 
 /** Error categories */
@@ -36,12 +36,19 @@ const errorHistory: ErrorContext[] = [];
 /** Maximum retry attempts before recommending model switch */
 const MAX_RETRIES = 3;
 
-/** Memory thresholds for warnings (in MB) */
-const MEMORY_THRESHOLDS = {
-  small: 3000, // 3GB minimum for small model
-  medium: 4000, // 4GB minimum for medium model
-  large: 8000, // 8GB minimum for large model
-};
+/**
+ * Get the next smaller model in the fallback chain.
+ * Fallback order: 27b -> 12b -> 4b -> 1b
+ */
+function getSmallerModel(model: ModelVariant): ModelVariant | null {
+  const fallbackOrder: ModelVariant[] = ['gemma3-27b', 'gemma3-12b', 'gemma3-4b', 'gemma3-1b'];
+  const index = fallbackOrder.indexOf(model);
+  // If not found or already at smallest (last index), return null
+  if (index === -1 || index === fallbackOrder.length - 1) {
+    return null;
+  }
+  return fallbackOrder[index + 1] ?? null;
+}
 
 /**
  * Categorize an error based on its message/type.
@@ -157,8 +164,8 @@ export function canAutoRecover(category: ErrorCategory, currentModel: ModelVaria
 
   // For OOM errors, we can try switching to a smaller model
   if (category === 'oom' && recentCount < MAX_RETRIES) {
-    // Can switch from large to medium, or from medium to small
-    return currentModel === 'large' || currentModel === 'medium';
+    // Can switch if there's a smaller model available
+    return getSmallerModel(currentModel) !== null;
   }
 
   // Network errors can be retried
@@ -177,20 +184,13 @@ export function getRecoveryAction(category: ErrorCategory, currentModel: ModelVa
   
   // For OOM, recommend smaller model
   if (category === 'oom') {
-    if (currentModel === 'large') {
+    const smallerModel = getSmallerModel(currentModel);
+    if (smallerModel) {
       return {
         success,
         message: getErrorMessage(category, new Error('OOM')),
         shouldSwitchModel: true,
-        recommendedModel: 'medium',
-      };
-    }
-    if (currentModel === 'medium') {
-      return {
-        success,
-        message: getErrorMessage(category, new Error('OOM')),
-        shouldSwitchModel: true,
-        recommendedModel: 'small',
+        recommendedModel: smallerModel,
       };
     }
   }
@@ -216,7 +216,7 @@ export function getRecoveryAction(category: ErrorCategory, currentModel: ModelVa
     success: false,
     message: getErrorMessage(category, new Error('Unknown error')),
     shouldSwitchModel: getRecentErrorCount('oom') >= 2,
-    recommendedModel: 'small',
+    recommendedModel: 'gemma3-1b',
   };
 }
 
@@ -250,7 +250,7 @@ export function getMemoryWarning(model: ModelVariant): string | null {
   const { sufficient, available, required } = checkMemorySufficient(model);
   
   if (!sufficient) {
-    return `Warning: Your device may have insufficient memory for this model. Available: ~${Math.round(available / 1000)}GB, Required: ~${Math.round(required / 1000)}GB. Consider using the smaller model.`;
+    return `Warning: Your device may have insufficient memory for this model. Available: ~${Math.round(available / 1000)}GB, Required: ~${Math.round(required / 1000)}GB. Consider using a smaller model.`;
   }
 
   // Check if memory is tight (between 80-100% of required)
