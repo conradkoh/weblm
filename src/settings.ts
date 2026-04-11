@@ -9,6 +9,7 @@
  */
 
 import { DEFAULT_GENERATION_CONFIG } from './config';
+import { logger } from './logger';
 
 /** Storage keys for localStorage */
 const STORAGE_KEYS = {
@@ -63,7 +64,7 @@ function setSetting<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, String(value));
   } catch (error) {
-    console.error(`[weblm] Failed to save setting ${key}:`, error);
+    logger.error(`Failed to save setting ${key}:`, error);
   }
 }
 

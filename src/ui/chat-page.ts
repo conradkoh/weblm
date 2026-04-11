@@ -14,6 +14,7 @@ import { createMessageInput } from './input';
 import { createUploadUI, type UploadedFile } from './upload';
 import { createSettingsButton } from './settings';
 import type { ChatMessage } from '../types';
+import { logger } from '../logger';
 
 /**
  * Callbacks needed for chat page interactions.
@@ -113,7 +114,7 @@ export function createChatPage(
     callbacks.onModelSwitch(customEvent.detail.model);
   }) as EventListener);
 
-  console.log('[weblm] chat UI ready');
+  logger.info('chat UI ready');
 
   return {
     chatMessagesContainer,

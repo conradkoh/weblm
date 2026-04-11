@@ -10,6 +10,7 @@ import { categorizeError, trackError, getErrorMessage, getRecoveryAction, getMem
 import { checkModelCached, getStorageEstimate, getStorageStatus } from './storage/index';
 import { loadChatMessages, saveChatMessages, clearChatMessages } from './storage/idb';
 import { injectGlobalStyles, lightTheme, darkTheme, applyThemeByName, watchSystemTheme } from './ui/styles';
+import { logger } from './logger';
 import { createStatusIndicator, setWebGPUStatus, setOnlineStatus, setModelStatus, setOfflineReadyStatus } from './ui/status';
 import { createProgressBar, updateProgress, hideProgressBar, showProgressError } from './ui/progress';
 import { createChatContainer, appendMessage, appendToLastMessage, finishLastMessage, scrollToBottom, clearChat, destroyChatContainer } from './ui/chat';
@@ -85,7 +86,7 @@ async function showChatUI(): Promise<void> {
   // Load chat history from IndexedDB
   await loadChatHistory();
 
-  console.log('[weblm] chat UI ready');
+  logger.info('chat UI ready');
 }
 
 /**
@@ -105,10 +106,10 @@ async function loadChatHistory(): Promise<void> {
         appendMessage(chatMessagesContainer!, message);
       });
       
-      console.log(`[weblm] loaded ${messages.length} messages from history`);
+      logger.debug(`loaded ${messages.length} messages from history`);
     }
   } catch (error) {
-    console.error('[weblm] failed to load chat history:', error);
+    logger.error('failed to load chat history:', error);
     // Continue with empty chat
   }
 }
@@ -119,9 +120,9 @@ async function loadChatHistory(): Promise<void> {
 async function saveChatHistory(): Promise<void> {
   try {
     await saveChatMessages(messages);
-    console.log(`[weblm] saved ${messages.length} messages to history`);
+    logger.debug(`saved ${messages.length} messages to history`);
   } catch (error) {
-    console.error('[weblm] failed to save chat history:', error);
+    logger.error('failed to save chat history:', error);
   }
 }
 
@@ -138,13 +139,13 @@ async function handleNewChat(): Promise<void> {
   try {
     await clearChatMessages();
   } catch (error) {
-    console.error('[weblm] failed to clear chat history:', error);
+    logger.error('failed to clear chat history:', error);
   }
   
   // Clear UI
   clearChat(chatMessagesContainer);
   
-  console.log('[weblm] chat cleared');
+  logger.info('chat cleared');
 }
 
 /**
@@ -171,7 +172,7 @@ async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
   try {
     await clearChatMessages();
   } catch (error) {
-    console.error('[weblm] failed to clear chat history:', error);
+    logger.error('failed to clear chat history:', error);
   }
 
   // Show loading state
@@ -204,7 +205,7 @@ async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
     // Remove progress indicator
     progressDiv.remove();
   } catch (error) {
-    console.error('[weblm] Model switch failed:', error);
+    logger.error('Model switch failed:', error);
     progressDiv.innerHTML = `<p class="error-message">Failed to load model: ${error instanceof Error ? error.message : 'Unknown error'}`;
     setModelStatus(null, false);
   }
@@ -216,7 +217,7 @@ async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
 function handleFileLoaded(file: UploadedFile): void {
   uploadedFile = file;
   uploadUI?.setFileInfo(file);
-  console.log(`[weblm] file loaded: ${file.name} (${file.size} bytes)`);
+  logger.debug(`file loaded: ${file.name} (${file.size} bytes)`);
 }
 
 /**
@@ -225,7 +226,7 @@ function handleFileLoaded(file: UploadedFile): void {
 function handleFileClear(): void {
   uploadedFile = null;
   uploadUI?.clearFileInfo();
-  console.log('[weblm] file cleared');
+  logger.debug('file cleared');
 }
 
 /**
@@ -318,7 +319,7 @@ async function handleSendMessage(userMessage: string): Promise<void> {
       },
       (error) => {
         // Error
-        console.error('[weblm] Generation error:', error);
+        logger.error('Generation error:', error);
         assistantMsg.content = `Error: ${error.message}`;
         assistantMsg.streaming = false;
         finishLastMessage(chatMessagesContainer!, assistantMsg);
@@ -332,7 +333,7 @@ async function handleSendMessage(userMessage: string): Promise<void> {
       { temperature, maxTokens, topP }
     );
   } catch (error) {
-    console.error('[weblm] Send message error:', error);
+    logger.error('Send message error:', error);
     assistantMsg.content = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     assistantMsg.streaming = false;
     finishLastMessage(chatMessagesContainer!, assistantMsg);
@@ -409,10 +410,10 @@ async function handleLoadModel(
     // Show chat UI
     showChatUI();
 
-    console.log(`[weblm] Model ${model} loaded successfully`);
+    logger.info(`Model ${model} loaded successfully`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[weblm] Model loading failed:', errorMessage);
+    logger.error('Model loading failed:', errorMessage);
 
     setModelStatus(null, false);
     showProgressError(`Failed to load model: ${errorMessage}`, () => {
@@ -429,7 +430,7 @@ async function handleLoadModel(
  * Initialize the WebLM application.
  */
 async function init(): Promise<void> {
-  console.log('[weblm] starting...');
+  logger.info('starting...');
 
   // Inject global styles
   injectGlobalStyles();
@@ -451,7 +452,7 @@ async function init(): Promise<void> {
   // Get the app container
   appContainer = document.getElementById('app');
   if (!appContainer) {
-    console.error('[weblm] App container not found');
+    logger.error('App container not found');
     return;
   }
 
@@ -564,7 +565,7 @@ async function init(): Promise<void> {
     });
   });
 
-  console.log('[weblm] initialization complete');
+  logger.info('initialization complete');
 }
 
 /**
@@ -582,5 +583,5 @@ function createStorageStatus(container: HTMLElement): void {
 
 // Start the application
 init().catch(error => {
-  console.error('[weblm] initialization failed:', error);
+  logger.error('initialization failed:', error);
 });

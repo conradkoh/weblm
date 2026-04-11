@@ -13,6 +13,7 @@
 import type { ChatMessage } from '../types';
 import { renderMarkdown } from './markdown';
 import { highlightCode } from './highlight';
+import { logger } from '../logger';
 
 /** Reference to the chat container element */
 let chatContainer: HTMLElement | null = null;
@@ -203,7 +204,7 @@ async function copyToClipboard(text: string, button: HTMLElement): Promise<void>
       recentlyCopied.set(buttonId, timeout);
     }
   } catch (err) {
-    console.error('[weblm] Failed to copy:', err);
+    logger.error('Failed to copy:', err);
     button.textContent = 'Failed';
     setTimeout(() => {
       button.textContent = 'Copy';

@@ -9,6 +9,7 @@
  */
 
 import { MODEL_INFO, type ModelVariant } from '../config';
+import { logger } from '../logger';
 
 /** Error categories */
 export type ErrorCategory = 'oom' | 'device-lost' | 'network' | 'validation' | 'unknown';
@@ -129,7 +130,7 @@ export function trackError(category: ErrorCategory, error: Error): void {
     errorHistory.shift();
   }
 
-  console.warn(`[weblm] Error tracked (${category}):`, error.message);
+  logger.warn(`Error tracked (${category}):`, error.message);
 }
 
 /**

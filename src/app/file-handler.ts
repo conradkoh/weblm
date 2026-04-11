@@ -7,6 +7,7 @@
  */
 
 import type { UploadedFile } from '../ui/upload';
+import { logger } from '../logger';
 
 /**
  * File upload state management interface.
@@ -32,7 +33,7 @@ export function handleFileLoaded(
 ): void {
   state.setUploadedFile(file);
   uploadUI?.setFileInfo(file);
-  console.log(`[weblm] file loaded: ${file.name} (${file.size} bytes)`);
+  logger.debug(`file loaded: ${file.name} (${file.size} bytes)`);
 }
 
 /**
@@ -45,7 +46,7 @@ export function handleFileClear(
 ): void {
   state.setUploadedFile(null);
   uploadUI?.clearFileInfo();
-  console.log('[weblm] file cleared');
+  logger.debug('file cleared');
 }
 
 /**

@@ -13,6 +13,7 @@ import { CreateMLCEngine, type MLCEngine, type InitProgressReport } from '@mlc-a
 import { MODEL_IDS, MODEL_INFO, DEFAULT_GENERATION_CONFIG, type ModelVariant } from '../config';
 import type { ModelProgress, ProgressCallback } from './types';
 import type { ChatMessage } from '../types';
+import { logger } from '../logger';
 
 // Module-level state
 let engine: MLCEngine | null = null;
@@ -164,7 +165,7 @@ export async function unloadEngine(): Promise<void> {
       engine = null;
       currentModel = null;
     } catch (error) {
-      console.error('[weblm] Error unloading engine:', error);
+      logger.error('Error unloading engine:', error);
     }
   }
 }
@@ -240,7 +241,7 @@ export async function sendMessage(
     onComplete(fullResponse);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.error('[weblm] Generation error:', err);
+    logger.error('Generation error:', err);
     onError(err);
   } finally {
     isGenerating = false;
@@ -255,7 +256,7 @@ export function stopGeneration(): void {
     try {
       engine.interruptGenerate();
     } catch (error) {
-      console.error('[weblm] Error stopping generation:', error);
+      logger.error('Error stopping generation:', error);
     }
     isGenerating = false;
   }

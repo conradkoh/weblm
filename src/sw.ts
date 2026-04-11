@@ -4,6 +4,10 @@
  * Handles PWA installation, offline detection, and service worker lifecycle.
  */
 
+import { createLogger } from './logger';
+
+const logger = createLogger('SW');
+
 /** Callback for offline status changes */
 type OfflineCallback = (isOffline: boolean, isReady: boolean) => void;
 
@@ -21,7 +25,7 @@ const offlineListeners: OfflineCallback[] = [];
  */
 export async function registerServiceWorker(): Promise<void> {
   if (!('serviceWorker' in navigator)) {
-    console.log('[SW] Service workers not supported');
+    logger.info('Service workers not supported');
     return;
   }
 
@@ -30,7 +34,7 @@ export async function registerServiceWorker(): Promise<void> {
       scope: '/',
     });
 
-    console.log('[SW] Service worker registered:', registration.scope);
+    logger.info('Service worker registered:', registration.scope);
 
     // Check for updates
     registration.addEventListener('updatefound', () => {
@@ -38,7 +42,7 @@ export async function registerServiceWorker(): Promise<void> {
       if (newWorker) {
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            console.log('[SW] New version available');
+            logger.info('New version available');
             // Optionally prompt user to refresh
           }
         });
@@ -51,14 +55,14 @@ export async function registerServiceWorker(): Promise<void> {
     offlineReady = true;
     notifyListeners();
 
-    console.log('[SW] Service worker is ready');
+    logger.info('Service worker is ready');
 
     // Check if we're offline
     if (!navigator.onLine) {
-      console.log('[SW] App is offline but service worker is active');
+      logger.info('App is offline but service worker is active');
     }
   } catch (error) {
-    console.error('[SW] Service worker registration failed:', error);
+    logger.error('Service worker registration failed:', error);
   }
 }
 
@@ -106,12 +110,12 @@ function notifyListeners(): void {
  */
 export function setupOfflineDetection(): void {
   window.addEventListener('online', () => {
-    console.log('[SW] App is online');
+    logger.info('App is online');
     notifyListeners();
   });
 
   window.addEventListener('offline', () => {
-    console.log('[SW] App is offline');
+    logger.info('App is offline');
     notifyListeners();
   });
 
