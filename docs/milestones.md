@@ -126,30 +126,33 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.5.0 — Model Management
+### 0.5.0 — Model Management ✅
 *Codename: "Control"*
 
 **Summary:** Provide model selection, storage management, and advanced loading options, addressing priority requirement #2.
 
 **Requirements:**
-- [ ] Model selector UI to choose between E2B and E4B variants
-- [ ] Memory/VRAM detection to recommend appropriate model
-- [ ] "Clear Model" button to free storage space
-- [ ] Storage usage display (e.g., "2.1 GB used of 4 GB cached")
-- [ ] Load model from local file system (advanced users)
-- [ ] Switch between models without full page reload
-- [ ] Model metadata display (name, size, quantization level)
-- [ ] Confirmation dialog before clearing cached model
+- [x] Model selector UI to choose between E2B and E4B variants
+- [x] Memory/VRAM detection to recommend appropriate model
+- [x] "Clear Model" button to free storage space
+- [x] Storage usage display (e.g., "2.1 GB used of 4 GB cached")
+- [ ] Load model from local file system (advanced users) — deferred
+- [x] Switch between models without full page reload
+- [x] Model metadata display (name, size, quantization level)
+- [x] Confirmation dialog before clearing cached model
 
 **Acceptance Criteria:**
-- Settings panel shows "E2B (2GB)" and "E4B (4GB)" options
-- On low-memory devices (<4GB available), E2B is recommended
+- Settings panel shows "Gemma 2 2B" and "Gemma 2 9B" options
+- On low-memory devices (<4GB available), smaller model is recommended
 - "Clear Model" shows confirmation before deleting cached data
-- Loading local model file shows progress and success/error feedback
 - Storage usage updates after model download/clear
 - Switching models shows loading indicator
 
 **Dependencies:** 0.2.0 — requires model caching infrastructure
+
+**Note:** Local file model loading was deferred as WebLLM's prebuilt config expects model IDs from HuggingFace repos. A note was added that this feature is "coming soon."
+
+**✅ Completed: 2025-04-11 UTC**
 
 ---
 

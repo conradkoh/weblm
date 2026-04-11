@@ -5,7 +5,7 @@
  */
 
 import { checkWebGPUSupport, WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
-import { initializeEngine, sendMessage, stopGeneration, getIsGenerating, deleteCachedModel } from './engine/index';
+import { initializeEngine, sendMessage, stopGeneration, getIsGenerating, deleteCachedModel, getCurrentModel, unloadEngine } from './engine/index';
 import { checkModelCached, getStorageEstimate, getStorageStatus } from './storage/index';
 import { injectGlobalStyles, lightTheme, applyTheme } from './ui/styles';
 import { createStatusIndicator, setWebGPUStatus, setOnlineStatus, setModelStatus } from './ui/status';
@@ -13,6 +13,7 @@ import { createProgressBar, updateProgress, hideProgressBar, showProgressError }
 import { createChatContainer, appendMessage, appendToLastMessage, finishLastMessage, scrollToBottom, clearChat } from './ui/chat';
 import { createMessageInput, setInputDisabled, clearInput, focusInput } from './ui/input';
 import { createUploadUI, type UploadedFile } from './ui/upload';
+import { createSettingsButton, showSettingsPanel, hideSettingsPanel, refreshSettingsPanel } from './ui/settings';
 import { MODEL_INFO, DEFAULT_MODEL, type ModelVariant } from './config';
 import type { ProgressCallback } from './engine/types';
 import type { ChatMessage } from './types';
@@ -125,7 +126,20 @@ function showChatUI(): void {
   appContainer.insertBefore(newStatusBar, mainContent);
 
   // Recreate status indicator in new status bar
-  createStatusIndicator(newStatusBar);
+  const statusSection = document.createElement('div');
+  statusSection.className = 'status-bar-content';
+  statusSection.style.cssText = 'display: flex; align-items: center; justify-content: space-between; width: 100%;';
+  
+  createStatusIndicator(statusSection);
+  
+  // Add settings button
+  const settingsContainer = document.createElement('div');
+  settingsContainer.style.cssText = 'display: flex; align-items: center; gap: var(--spacing-md);';
+  createSettingsButton(settingsContainer);
+  statusSection.appendChild(settingsContainer);
+  
+  newStatusBar.appendChild(statusSection);
+
   setWebGPUStatus(true);
   setModelStatus(MODEL_INFO[currentModelVariant].name, false);
 
@@ -156,7 +170,70 @@ function showChatUI(): void {
   window.addEventListener('offline', () => setOnlineStatus(false));
   setOnlineStatus(navigator.onLine);
 
+  // Handle model switch event
+  window.addEventListener('model-switch', async (e: Event) => {
+    const customEvent = e as CustomEvent<{ model: ModelVariant }>;
+    const model = customEvent.detail.model;
+    await handleModelSwitch(model);
+  });
+
   console.log('[weblm] chat UI ready');
+}
+
+/**
+ * Handle model switch.
+ */
+async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
+  if (getIsGenerating()) {
+    alert('Cannot switch model while generating. Please wait for the current response to complete.');
+    return;
+  }
+
+  const currentModel = getCurrentModel();
+  if (currentModel === newModel) {
+    return; // Already using this model
+  }
+
+  // Clear chat for model switch
+  if (chatMessagesContainer) {
+    clearChat(chatMessagesContainer);
+  }
+  messages = [];
+
+  // Show loading state
+  setModelStatus(MODEL_INFO[newModel].name, true);
+
+  // Unload current model
+  await unloadEngine();
+
+  // Show progress
+  const progressDiv = document.createElement('div');
+  progressDiv.id = 'model-switch-progress';
+  progressDiv.style.cssText = 'padding: var(--spacing-lg); text-align: center;';
+  progressDiv.innerHTML = `<p>Loading ${MODEL_INFO[newModel].name}...</p>`;
+  if (chatMessagesContainer) {
+    chatMessagesContainer.appendChild(progressDiv);
+  }
+
+  // Load new model
+  try {
+    await initializeEngine(newModel, (progress) => {
+      const progressText = progressDiv.querySelector('p');
+      if (progressText) {
+        progressText.textContent = `${progress.message} (${Math.round(progress.progress)}%)`;
+      }
+    });
+
+    currentModelVariant = newModel;
+    setModelStatus(MODEL_INFO[newModel].name, false);
+
+    // Remove progress indicator
+    progressDiv.remove();
+  } catch (error) {
+    console.error('[weblm] Model switch failed:', error);
+    progressDiv.innerHTML = `<p class="error-message">Failed to load model: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    setModelStatus(null, false);
+  }
 }
 
 /**
