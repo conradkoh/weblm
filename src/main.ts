@@ -7,10 +7,11 @@
 import { checkWebGPUSupport, WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
 import { initializeEngine, sendMessage, stopGeneration, getIsGenerating, deleteCachedModel, getCurrentModel, unloadEngine } from './engine/index';
 import { checkModelCached, getStorageEstimate, getStorageStatus } from './storage/index';
+import { loadChatMessages, saveChatMessages, clearChatMessages } from './storage/idb';
 import { injectGlobalStyles, lightTheme, applyTheme } from './ui/styles';
 import { createStatusIndicator, setWebGPUStatus, setOnlineStatus, setModelStatus } from './ui/status';
 import { createProgressBar, updateProgress, hideProgressBar, showProgressError } from './ui/progress';
-import { createChatContainer, appendMessage, appendToLastMessage, finishLastMessage, scrollToBottom, clearChat } from './ui/chat';
+import { createChatContainer, appendMessage, appendToLastMessage, finishLastMessage, scrollToBottom, clearChat, destroyChatContainer } from './ui/chat';
 import { createMessageInput, setInputDisabled, clearInput, focusInput } from './ui/input';
 import { createUploadUI, type UploadedFile } from './ui/upload';
 import { createSettingsButton, showSettingsPanel, hideSettingsPanel, refreshSettingsPanel } from './ui/settings';
@@ -113,7 +114,7 @@ function createLoadButtons(): { container: HTMLElement; setButtonsState: (enable
 /**
  * Switch to chat UI after model loads.
  */
-function showChatUI(): void {
+async function showChatUI(): Promise<void> {
   if (!mainContent || !statusBar || !appContainer) return;
 
   // Clear the main content
@@ -132,9 +133,18 @@ function showChatUI(): void {
   
   createStatusIndicator(statusSection);
   
-  // Add settings button
+  // Add New Chat and settings buttons
   const settingsContainer = document.createElement('div');
   settingsContainer.style.cssText = 'display: flex; align-items: center; gap: var(--spacing-md);';
+  
+  // Add New Chat button
+  const newChatBtn = document.createElement('button');
+  newChatBtn.className = 'new-chat-btn';
+  newChatBtn.innerHTML = `<span>+</span> New Chat`;
+  newChatBtn.title = 'Start a new conversation';
+  newChatBtn.addEventListener('click', handleNewChat);
+  settingsContainer.appendChild(newChatBtn);
+  
   createSettingsButton(settingsContainer);
   statusSection.appendChild(settingsContainer);
   
@@ -177,7 +187,69 @@ function showChatUI(): void {
     await handleModelSwitch(model);
   });
 
+  // Load chat history from IndexedDB
+  await loadChatHistory();
+
   console.log('[weblm] chat UI ready');
+}
+
+/**
+ * Load chat history from IndexedDB.
+ */
+async function loadChatHistory(): Promise<void> {
+  if (!chatMessagesContainer) return;
+
+  try {
+    const savedMessages = await loadChatMessages();
+    
+    if (savedMessages && savedMessages.length > 0) {
+      messages = savedMessages;
+      
+      // Render all messages
+      messages.forEach(message => {
+        appendMessage(chatMessagesContainer!, message);
+      });
+      
+      console.log(`[weblm] loaded ${messages.length} messages from history`);
+    }
+  } catch (error) {
+    console.error('[weblm] failed to load chat history:', error);
+    // Continue with empty chat
+  }
+}
+
+/**
+ * Save current messages to IndexedDB.
+ */
+async function saveChatHistory(): Promise<void> {
+  try {
+    await saveChatMessages(messages);
+    console.log(`[weblm] saved ${messages.length} messages to history`);
+  } catch (error) {
+    console.error('[weblm] failed to save chat history:', error);
+  }
+}
+
+/**
+ * Clear chat history and IndexedDB.
+ */
+async function handleNewChat(): Promise<void> {
+  if (!chatMessagesContainer) return;
+
+  // Clear in-memory messages
+  messages = [];
+  
+  // Clear IndexedDB
+  try {
+    await clearChatMessages();
+  } catch (error) {
+    console.error('[weblm] failed to clear chat history:', error);
+  }
+  
+  // Clear UI
+  clearChat(chatMessagesContainer);
+  
+  console.log('[weblm] chat cleared');
 }
 
 /**
@@ -194,11 +266,18 @@ async function handleModelSwitch(newModel: ModelVariant): Promise<void> {
     return; // Already using this model
   }
 
-  // Clear chat for model switch
+  // Clear chat for model switch (including IndexedDB)
   if (chatMessagesContainer) {
     clearChat(chatMessagesContainer);
   }
   messages = [];
+  
+  // Clear IndexedDB chat history
+  try {
+    await clearChatMessages();
+  } catch (error) {
+    console.error('[weblm] failed to clear chat history:', error);
+  }
 
   // Show loading state
   setModelStatus(MODEL_INFO[newModel].name, true);
@@ -321,6 +400,9 @@ async function handleSendMessage(userMessage: string): Promise<void> {
         isGenerating = false;
         setInputDisabled(false);
         focusInput();
+        
+        // Save chat history after completion
+        saveChatHistory();
       },
       (error) => {
         // Error
@@ -331,6 +413,9 @@ async function handleSendMessage(userMessage: string): Promise<void> {
         isGenerating = false;
         setInputDisabled(false);
         focusInput();
+        
+        // Save even on error
+        saveChatHistory();
       }
     );
   } catch (error) {
@@ -341,6 +426,9 @@ async function handleSendMessage(userMessage: string): Promise<void> {
     isGenerating = false;
     setInputDisabled(false);
     focusInput();
+    
+    // Save even on error
+    saveChatHistory();
   }
 }
 

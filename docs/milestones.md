@@ -156,20 +156,20 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.6.0 — Chat UX Polish
+### 0.6.0 — Chat UX Polish ✅
 *Codename: "Refine"*
 
 **Summary:** Improve the chat experience with rich formatting and history persistence.
 
 **Requirements:**
-- [ ] Markdown rendering in responses (headers, lists, bold, italic)
-- [ ] Code syntax highlighting for code blocks
-- [ ] Copy message button for each message
-- [ ] Copy code block button with one-click copy
-- [ ] Chat history persistence in IndexedDB
-- [ ] Clear chat / new conversation button
-- [ ] Message timestamps (relative: "2 minutes ago")
-- [ ] Scroll position preserved across sessions
+- [x] Markdown rendering in responses (headers, lists, bold, italic)
+- [x] Code syntax highlighting for code blocks
+- [x] Copy message button for each message
+- [x] Copy code block button with one-click copy
+- [x] Chat history persistence in IndexedDB
+- [x] Clear chat / new conversation button
+- [x] Message timestamps (relative: "2 minutes ago")
+- [ ] Scroll position preserved across sessions — deferred
 
 **Acceptance Criteria:**
 - Claude responses with `# Heading` render as actual headings
@@ -180,6 +180,10 @@ These are the top user priorities that must be addressed prominently:
 - Timestamps update correctly (e.g., "Just now" → "5m ago")
 
 **Dependencies:** 0.3.0 — requires basic chat
+
+**Note:** Scroll position preservation was deferred to keep scope manageable. Can be added in a future update if requested.
+
+**✅ Completed: 2026-04-11 UTC**
 
 ---
 
