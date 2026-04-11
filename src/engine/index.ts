@@ -5,17 +5,20 @@
  * - Model loading / initialization via WebLLM
  * - Progress reporting during model download
  * - Engine instance management
+ * - Chat completions with streaming
  * - Memory-aware model selection
  */
 
 import { CreateMLCEngine, type MLCEngine, type InitProgressReport } from '@mlc-ai/web-llm';
-import { MODEL_IDS, MODEL_INFO, type ModelVariant } from '../config';
+import { MODEL_IDS, MODEL_INFO, DEFAULT_GENERATION_CONFIG, type ModelVariant } from '../config';
 import type { ModelProgress, ProgressCallback } from './types';
+import type { ChatMessage } from '../types';
 
 // Module-level state
 let engine: MLCEngine | null = null;
 let currentModel: ModelVariant | null = null;
 let loadingController: AbortController | null = null;
+let isGenerating = false;
 
 /**
  * Check if a model is already cached in IndexedDB.
@@ -144,6 +147,13 @@ export function getCurrentModel(): ModelVariant | null {
 }
 
 /**
+ * Check if the engine is currently generating.
+ */
+export function getIsGenerating(): boolean {
+  return isGenerating;
+}
+
+/**
  * Unload the engine and free memory.
  */
 export async function unloadEngine(): Promise<void> {
@@ -166,6 +176,86 @@ export async function deleteCachedModel(model: ModelVariant): Promise<void> {
   const modelId = MODEL_IDS[model];
   const { deleteModelAllInfoInCache } = await import('@mlc-ai/web-llm');
   await deleteModelAllInfoInCache(modelId);
+}
+
+/**
+ * Convert our chat messages to WebLLM/OpenAI format.
+ */
+function toWebLLMMessages(messages: ChatMessage[]): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
+  return messages
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
+}
+
+/**
+ * Send a message to the model and stream the response.
+ * 
+ * @param messages - Chat history (will be converted to WebLLM format)
+ * @param onToken - Callback for each token received
+ * @param onComplete - Callback when generation is complete
+ * @param onError - Callback for errors
+ */
+export async function sendMessage(
+  messages: ChatMessage[],
+  onToken: (token: string) => void,
+  onComplete: (fullResponse: string) => void,
+  onError: (error: Error) => void
+): Promise<void> {
+  if (!engine) {
+    onError(new Error('Model not loaded'));
+    return;
+  }
+
+  if (isGenerating) {
+    onError(new Error('Already generating'));
+    return;
+  }
+
+  isGenerating = true;
+
+  try {
+    const stream = await engine.chat.completions.create({
+      messages: toWebLLMMessages(messages),
+      stream: true,
+      temperature: DEFAULT_GENERATION_CONFIG.temperature,
+      max_tokens: DEFAULT_GENERATION_CONFIG.maxTokens,
+    });
+
+    let fullResponse = '';
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content || '';
+      if (delta) {
+        fullResponse += delta;
+        onToken(delta);
+      }
+    }
+
+    onComplete(fullResponse);
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error('[weblm] Generation error:', err);
+    onError(err);
+  } finally {
+    isGenerating = false;
+  }
+}
+
+/**
+ * Stop the current generation.
+ */
+export function stopGeneration(): void {
+  if (engine && isGenerating) {
+    try {
+      engine.interruptGenerate();
+    } catch (error) {
+      console.error('[weblm] Error stopping generation:', error);
+    }
+    isGenerating = false;
+  }
 }
 
 export type { MLCEngine, InitProgressReport };

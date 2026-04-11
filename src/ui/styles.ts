@@ -420,6 +420,153 @@ export function injectGlobalStyles(): void {
       color: var(--color-success);
       margin-top: var(--spacing-xs);
     }
+
+    /* Chat container */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--spacing-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+
+    /* Chat message bubbles */
+    .chat-message {
+      display: flex;
+      max-width: 80%;
+    }
+
+    .chat-message-user {
+      margin-left: auto;
+    }
+
+    .chat-message-assistant {
+      margin-right: auto;
+    }
+
+    .chat-bubble {
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--border-radius);
+      max-width: 100%;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    .chat-message-user .chat-bubble {
+      background-color: var(--color-primary);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-message-assistant .chat-bubble {
+      background-color: var(--color-surface);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+      border-bottom-left-radius: 4px;
+    }
+
+    .chat-content {
+      line-height: 1.5;
+    }
+
+    .chat-timestamp {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      margin-top: var(--spacing-xs);
+      opacity: 0.7;
+    }
+
+    .chat-message-user .chat-timestamp {
+      color: rgba(255, 255, 255, 0.8);
+      text-align: right;
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background-color: var(--color-text-secondary);
+      border-radius: 50%;
+      animation: typing-bounce 1.4s infinite ease-in-out both;
+    }
+
+    .typing-indicator span:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    .typing-indicator span:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+
+    @keyframes typing-bounce {
+      0%, 80%, 100% {
+        transform: scale(0);
+      }
+      40% {
+        transform: scale(1);
+      }
+    }
+
+    /* Input area */
+    .input-container {
+      display: flex;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-md);
+      background-color: var(--color-surface);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .input-textarea {
+      flex: 1;
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-size: var(--font-size-base);
+      font-family: inherit;
+      line-height: 1.5;
+      color: var(--color-text);
+      background-color: var(--color-background);
+      border: 1px solid var(--color-border);
+      border-radius: var(--border-radius);
+      resize: none;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .input-textarea:focus {
+      border-color: var(--color-primary);
+    }
+
+    .input-textarea:disabled {
+      background-color: var(--color-surface);
+      color: var(--color-text-secondary);
+      cursor: not-allowed;
+    }
+
+    .input-textarea::placeholder {
+      color: var(--color-text-secondary);
+    }
+
+    .input-buttons {
+      display: flex;
+      gap: var(--spacing-sm);
+      align-items: flex-end;
+    }
   `;
 
   document.head.appendChild(styleElement);

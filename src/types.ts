@@ -8,13 +8,19 @@
 import type { ModelState, ModelVariant } from './engine/types';
 
 /**
+ * Chat message role.
+ */
+export type MessageRole = 'user' | 'assistant' | 'system';
+
+/**
  * Chat message representation.
+ * Compatible with WebLLM/OpenAI chat format.
  */
 export interface ChatMessage {
   /** Unique message identifier */
   id: string;
-  /** Role: user or assistant */
-  role: 'user' | 'assistant';
+  /** Role: user, assistant, or system */
+  role: MessageRole;
   /** Message content (text) */
   content: string;
   /** Timestamp (ISO string) */
@@ -53,4 +59,9 @@ export interface GenerationOptions {
   systemPrompt?: string;
 }
 
-export {};
+/**
+ * Generate a unique ID.
+ */
+export function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}

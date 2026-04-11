@@ -68,19 +68,19 @@ These are the top user priorities that must be addressed prominently:
 
 ---
 
-### 0.3.0 — Basic Chat
+### 0.3.0 — Basic Chat ✅
 *Codename: "Conversation"*
 
 **Summary:** Implement core chat functionality with real-time streaming responses.
 
 **Requirements:**
-- [ ] Text input area with send button
-- [ ] User messages display in chat window
-- [ ] Model generates responses with token-by-token streaming
-- [ ] Auto-scroll to keep latest messages visible during generation
-- [ ] Basic in-memory message history (resets on page reload)
-- [ ] Stop generation button during streaming
-- [ ] Generation state indicator (typing, ready, error)
+- [x] Text input area with send button
+- [x] User messages display in chat window
+- [x] Model generates responses with token-by-token streaming
+- [x] Auto-scroll to keep latest messages visible during generation
+- [x] Basic in-memory message history (resets on page reload)
+- [x] Stop generation button during streaming
+- [x] Generation state indicator (typing, ready, error)
 
 **Acceptance Criteria:**
 - User can type a message and press Enter or click Send
@@ -91,6 +91,8 @@ These are the top user priorities that must be addressed prominently:
 - Previous messages remain visible during new generation
 
 **Dependencies:** 0.2.0 — requires loaded model
+
+**✅ Completed: 2025-04-11 UTC**
 
 ---
 
