@@ -37,8 +37,9 @@ export interface FormatterBackend {
    * Backend type identifier.
    * 'local' = uses WebLLM/transformers.js engine
    * 'cloud' = uses OpenAI-compatible REST API
+   * 'worker' = uses Web Worker pool with Transformers.js in WASM mode
    */
-  type(): 'local' | 'cloud';
+  type(): 'local' | 'cloud' | 'worker';
 }
 
 /**

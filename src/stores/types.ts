@@ -112,4 +112,8 @@ export interface FormatterState {
   cloudApiKey: string;
   cloudApiModel: string;
   useCloudApi: boolean;
+  // Worker Pool configuration (Experimental)
+  useWorkerPool: boolean;
+  workerPoolSize: number;  // 1-4, default 2
+  workerModelId: string;   // model to load in workers
 }

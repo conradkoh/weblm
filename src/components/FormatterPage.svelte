@@ -29,6 +29,9 @@
     setCloudApiKey,
     setCloudApiModel,
     setUseCloudApi,
+    setUseWorkerPool,
+    setWorkerPoolSize,
+    setWorkerModelId,
   } from '../stores/formatterStore.svelte';
   import type { ExtractionResult } from '../stores/types';
 
@@ -138,6 +141,22 @@
   }
 
   let cloudSettingsExpanded = $state(false);
+  let workerPoolExpanded = $state(false);
+
+  function handleWorkerPoolToggle(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    setUseWorkerPool(target.checked);
+  }
+
+  function handleWorkerPoolSizeChange(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    setWorkerPoolSize(parseInt(target.value, 10));
+  }
+
+  function handleWorkerModelIdChange(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    setWorkerModelId(target.value);
+  }
 
   function handleCopyToClipboard(result: ExtractionResult): void {
     const text = result.title ? `## ${result.title}\n\n${result.content}` : result.content;
@@ -238,8 +257,15 @@
 
   // Get backend type indicator for display
   const backendTypeLabel = $derived(
-    cloudApiConfigured ? `Cloud API (concurrency: 5)` : `Local Engine (concurrency: 1)`
+    cloudApiConfigured 
+      ? `Cloud API (concurrency: 5)` 
+      : formatterState.useWorkerPool && formatterState.workerModelId
+        ? `Worker Pool (${formatterState.workerPoolSize} workers)`
+        : `Local Engine (concurrency: 1)`
   );
+
+  // Worker pool is disabled when cloud API is active
+  const workerPoolDisabled = $derived(formatterState.useCloudApi);
 
   // Get relevance badge class
   function getRelevanceBadgeClass(relevance: string): string {
@@ -379,6 +405,90 @@
                 placeholder="gpt-4o-mini"
                 class="w-full px-3 py-1.5 text-sm rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900"
               />
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </div>
+  <!-- Worker Pool Settings (Collapsible, Experimental) -->
+  <div class="px-4 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+    <button
+      type="button"
+      class="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 w-full"
+      onclick={() => workerPoolExpanded = !workerPoolExpanded}
+      disabled={workerPoolDisabled}
+    >
+      <span>{workerPoolExpanded ? '▼' : '▶'}</span>
+      <span>⚡ Worker Pool (Experimental)</span>
+      {#if workerPoolDisabled}
+        <span class="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+          Disabled (Cloud API active)
+        </span>
+      {:else if formatterState.useWorkerPool && formatterState.workerModelId}
+        <span class="text-xs px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400">
+          {formatterState.workerPoolSize} workers
+        </span>
+      {:else if formatterState.useWorkerPool}
+        <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400">
+          ⚠ Select model
+        </span>
+      {/if}
+    </button>
+    {#if workerPoolExpanded}
+      <div class="mt-2 p-3 bg-white dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
+        <label class="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            checked={formatterState.useWorkerPool}
+            onchange={handleWorkerPoolToggle}
+            disabled={workerPoolDisabled}
+            class="rounded border-gray-300 dark:border-slate-600"
+          />
+          <span class="text-sm font-medium text-gray-700 dark:text-slate-300">Use Worker Pool</span>
+          {#if formatterState.useWorkerPool}
+            <span class="text-xs text-gray-500 dark:text-slate-500">({backendTypeLabel})</span>
+          {/if}
+        </label>
+        {#if formatterState.useWorkerPool}
+          <div class="space-y-3">
+            <div>
+              <label for="worker-model" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                Worker Model (Transformers.js compatible)
+              </label>
+              <input
+                id="worker-model"
+                type="text"
+                value={formatterState.workerModelId}
+                oninput={handleWorkerModelIdChange}
+                placeholder="Xenova/phi-2"
+                class="w-full px-3 py-1.5 text-sm rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900"
+              />
+              <p class="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                Must be a model compatible with Transformers.js (e.g., Xenova/phi-2)
+              </p>
+            </div>
+            <div>
+              <label for="worker-size" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                Number of Workers (1-4)
+              </label>
+              <input
+                id="worker-size"
+                type="range"
+                min="1"
+                max="4"
+                value={formatterState.workerPoolSize}
+                oninput={handleWorkerPoolSizeChange}
+                class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 dark:bg-slate-600"
+              />
+              <div class="flex justify-between text-xs text-gray-500 dark:text-slate-500 mt-1">
+                <span>1</span>
+                <span>Current: {formatterState.workerPoolSize}</span>
+                <span>4</span>
+              </div>
+              <p class="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                ⚠️ Each worker loads its own model copy. Memory usage = workers × model size.
+              </p>
             </div>
           </div>
         {/if}
