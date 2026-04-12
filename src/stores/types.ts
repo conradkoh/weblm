@@ -140,4 +140,9 @@ export interface FormatterState {
   // Timing metrics for runs
   runStartedAt: number | null;     // timestamp when current/last run started
   runCompletedAt: number | null;    // timestamp when current/last run completed
+  // Partial results for progressive output
+  partialRefinedChunks: string[];           // completed chunks during refinement
+  partialExtractionResults: ExtractionResult[];  // completed extraction results
+  // Stop flag for cancellation
+  isStopped: boolean;
 }

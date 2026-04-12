@@ -54,6 +54,11 @@ const _state = $state<FormatterState>({
   // Timing metrics for runs
   runStartedAt: null,
   runCompletedAt: null,
+  // Partial results for progressive output
+  partialRefinedChunks: [],
+  partialExtractionResults: [],
+  // Stop flag for cancellation
+  isStopped: false,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -227,6 +232,57 @@ export function clearStreamingText(): void {
   _state.streamingText = '';
 }
 
+// Partial results functions for progressive output
+export function addPartialRefinedChunk(chunk: string): void {
+  _state.partialRefinedChunks = [..._state.partialRefinedChunks, chunk];
+}
+
+export function addPartialExtractionResult(result: ExtractionResult): void {
+  _state.partialExtractionResults = [..._state.partialExtractionResults, result];
+}
+
+/**
+ * Stop the current processing and promote partial results.
+ * Used by the Stop button to cancel mid-run while keeping results.
+ */
+export function stopProcessing(): void {
+  if (!_state.isProcessing) return;
+  
+  logger.info('Stop requested - promoting partial results');
+  
+  // Stop processing
+  _state.isProcessing = false;
+  _state.isStopped = true;
+  
+  // Promote partial results to final
+  if (_state.partialRefinedChunks.length > 0) {
+    _state.refinedChunks = _state.partialRefinedChunks;
+    logger.info(`Promoted ${_state.partialRefinedChunks.length} partial refined chunks to final`);
+  }
+  
+  if (_state.partialExtractionResults.length > 0) {
+    _state.extractionResults = _state.partialExtractionResults;
+    logger.info(`Promoted ${_state.partialExtractionResults.length} partial extraction results to final`);
+  }
+  
+  // Set states to complete with partial indicator
+  if (_state.refinementState !== 'idle' && _state.refinementState !== 'complete') {
+    setRefinementState('complete');
+    setCurrentPhase(`Stopped: ${_state.partialRefinedChunks.length} of ${_state.totalChunks} chunks completed`);
+  }
+  
+  if (_state.extractionState !== 'idle' && _state.extractionState !== 'complete') {
+    setExtractionState('complete');
+  }
+  
+  // Complete task plan
+  completeTaskPlan();
+  _state.runCompletedAt = Date.now();
+  
+  // Clear streaming
+  clearStreamingText();
+}
+
 // Cache functions for refinement results
 export function invalidateRefinementCache(): void {
   _state.sourceContentHash = null;
@@ -283,6 +339,9 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
   _state.isProcessing = true;
   _state.errorMessage = null;
   _state.refinedChunks = [];
+  _state.partialRefinedChunks = [];
+  _state.partialExtractionResults = [];
+  _state.isStopped = false;
   _state.runStartedAt = Date.now();
   _state.runCompletedAt = null;
 
@@ -379,11 +438,17 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       await tick(); // Allow UI to repaint after state update
     };
     
+    // Chunk complete callback for progressive output
+    const onChunkComplete = (chunk: string, index: number) => {
+      addPartialRefinedChunk(chunk);
+    };
+    
     const { formattedChunks, analyses } = await processPipeline(
       chunks,
       backend,
       pipelineProgressHandler,
-      streamingCallback
+      streamingCallback,
+      onChunkComplete
     );
     
     logger.info(`Refinement: Pipeline complete with ${formattedChunks.length} chunks and ${analyses.length} analyses`);
@@ -446,6 +511,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
 export function resetRefinement(): void {
   _state.refinementState = 'idle';
   _state.refinedChunks = [];
+  _state.partialRefinedChunks = [];
   _state.errorMessage = null;
   _state.currentPhase = null;
   _state.totalChunks = 0;
@@ -453,6 +519,7 @@ export function resetRefinement(): void {
   _state.chunkPhase = null;
   _state.runStartedAt = null;
   _state.runCompletedAt = null;
+  _state.isStopped = false;
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();
@@ -576,12 +643,14 @@ export async function runExtraction(): Promise<void> {
 export function resetExtraction(): void {
   _state.extractionState = 'idle';
   _state.extractionResults = [];
+  _state.partialExtractionResults = [];
   _state.showAllResults = false;
   _state.totalChunks = 0;
   _state.completedChunks = 0;
   _state.chunkPhase = null;
   _state.runStartedAt = null;
   _state.runCompletedAt = null;
+  _state.isStopped = false;
   resetTaskPlan();
   clearStreamingText();
 }
@@ -672,6 +741,9 @@ export function resetFormatterState(): void {
   _state.chunkPhase = null;
   _state.runStartedAt = null;
   _state.runCompletedAt = null;
+  _state.partialRefinedChunks = [];
+  _state.partialExtractionResults = [];
+  _state.isStopped = false;
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();

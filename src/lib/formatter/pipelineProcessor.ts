@@ -34,13 +34,15 @@ export interface PipelineResult {
  * @param backend - Formatter backend (local or worker pool)
  * @param onProgress - Optional callback for progress updates
  * @param onToken - Optional callback for streaming token feedback
+ * @param onChunkComplete - Optional callback called after each chunk is formatted
  * @returns Promise resolving to formatted chunks and cohesion analyses
  */
 export async function processPipeline(
   chunks: string[],
   backend: FormatterBackend,
   onProgress?: (progress: PipelineProgress) => void | Promise<void>,
-  onToken?: (token: string) => void
+  onToken?: (token: string) => void,
+  onChunkComplete?: (chunk: string, index: number) => void
 ): Promise<PipelineResult> {
   if (chunks.length === 0) {
     return { formattedChunks: [], analyses: [] };
@@ -75,6 +77,8 @@ export async function processPipeline(
       for (const result of batchResults) {
         formattedChunks[result.index] = result.formatted;
         formattedCount++;
+        // Notify partial result
+        onChunkComplete?.(result.formatted, result.index);
       }
       
       await onProgress?.({
@@ -143,6 +147,8 @@ export async function processPipeline(
     // Format the first chunk
     formattedChunks[0] = await formatChunkToMarkdown(chunks[0]!, backend, { onToken });
     formattedCount = 1;
+    // Notify partial result
+    onChunkComplete?.(formattedChunks[0]!, 0);
     
     await onProgress?.({
       phase: 'formatting',
@@ -157,6 +163,8 @@ export async function processPipeline(
       // Format chunk[i]
       formattedChunks[i] = await formatChunkToMarkdown(chunks[i]!, backend, { onToken });
       formattedCount++;
+      // Notify partial result
+      onChunkComplete?.(formattedChunks[i]!, i);
       
       await onProgress?.({
         phase: 'formatting',

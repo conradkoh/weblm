@@ -28,6 +28,7 @@
     setUseWorkerPool,
     setWorkerPoolSize,
     setWorkerModelId,
+    stopProcessing,
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
   import type { ExtractionResult } from '../stores/types';
@@ -134,6 +135,10 @@
     }
     
     await runRefinement({ force });
+  }
+
+  function handleStop(): void {
+    stopProcessing();
   }
 
   async function handleRunExtraction(): Promise<void> {
@@ -468,6 +473,16 @@
           >
             {isRefining ? 'Refining...' : 'Refine Source'}
           </Button>
+          {#if formatterState.isProcessing}
+            <Button
+              variant="destructive"
+              size="sm"
+              title="Stop processing"
+              onclick={handleStop}
+            >
+              ⏹ Stop
+            </Button>
+          {/if}
         </div>
       </div>
       <Textarea
@@ -689,6 +704,9 @@
       <div class="flex items-center justify-between">
         <span class="text-xs text-gray-600 dark:text-slate-400">
           {formatterState.currentPhase ?? 'Processing...'}
+          {#if formatterState.partialRefinedChunks.length > 0}
+            — {formatterState.partialRefinedChunks.length} chunks done
+          {/if}
         </span>
         <span class="text-xs text-gray-500 dark:text-slate-500">
           Running... {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
@@ -704,10 +722,18 @@
     </div>
   {:else if formatterState.refinementState === 'complete' && formatterState.refinedChunks.length > 0}
     <div class="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-400 flex-shrink-0">
-      ✓ {formatterState.currentPhase?.includes('cached') ? formatterState.currentPhase : `Refinement complete — ${formatterState.refinedChunks.length} chunks ready. Add format criteria and run extraction.`}
-      {#if formatterState.runCompletedAt && formatterState.runStartedAt && !formatterState.currentPhase?.includes('cached')}
+      {#if formatterState.isStopped}
+        ⏹ Stopped: {formatterState.partialRefinedChunks.length} of {formatterState.totalChunks} chunks completed
+      {:else}
+        ✓ {formatterState.currentPhase?.includes('cached') ? formatterState.currentPhase : `Refinement complete — ${formatterState.refinedChunks.length} chunks ready. Add format criteria and run extraction.`}
+      {/if}
+      {#if !formatterState.isStopped && formatterState.runCompletedAt && formatterState.runStartedAt && !formatterState.currentPhase?.includes('cached')}
         <span class="ml-2 text-xs opacity-70">({formatDuration(formatterState.runCompletedAt - formatterState.runStartedAt)})</span>
       {/if}
+    </div>
+  {:else if formatterState.isStopped}
+    <div class="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 text-sm text-yellow-700 dark:text-yellow-400 flex-shrink-0">
+      ⏹ Processing stopped — {formatterState.partialRefinedChunks.length} chunks available
     </div>
   {:else if formatterState.sourceContent.trim()}
     <div class="px-4 py-2 bg-gray-100 dark:bg-slate-800/80 text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">
