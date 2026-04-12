@@ -47,6 +47,8 @@ const _state = $state<FormatterState>({
     currentPhaseIndex: 0,
     status: 'idle',
   },
+  // Streaming text for live token feedback
+  streamingText: '',
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -176,6 +178,15 @@ export function completeTaskPlan(): void {
 
 export function resetTaskPlan(): void {
   _state.taskPlan = { phases: [], currentPhaseIndex: 0, status: 'idle' };
+}
+
+// Streaming text mutations for live token feedback
+export function appendStreamingToken(token: string): void {
+  _state.streamingText += token;
+}
+
+export function clearStreamingText(): void {
+  _state.streamingText = '';
 }
 
 /**
@@ -348,6 +359,7 @@ export function resetRefinement(): void {
   _state.completedChunks = 0;
   _state.chunkPhase = null;
   resetTaskPlan();
+  clearStreamingText();
 }
 
 // ─── Extraction Pipeline ──────────────────────────────────────
@@ -392,6 +404,12 @@ export async function runExtraction(): Promise<void> {
   // Track phase transitions to avoid calling advancePhase() multiple times
   let hasAdvancedToExtracting = false;
 
+  // Clear and set up streaming for extraction
+  clearStreamingText();
+  const streamingCallback = (token: string) => {
+    appendStreamingToken(token);
+  };
+
   try {
     setExtractionState('parsing');
     setCurrentPhase('Parsing refined chunks...');
@@ -400,8 +418,12 @@ export async function runExtraction(): Promise<void> {
     const results = await processChunks(
       refinedChunks,
       desiredFormat,
-      { concurrency },
+      { concurrency, onToken: streamingCallback },
       (progress: ExtractionProgress) => {
+        // Clear streaming at start of each phase
+        if (progress.phase === 'extracting' && progress.current === 1) {
+          clearStreamingText();
+        }
         setCurrentPhase(progress.message);
         setCompletedChunks(progress.current);
         if (progress.phase === 'parsing') {
@@ -421,6 +443,7 @@ export async function runExtraction(): Promise<void> {
       backend
     );
 
+    clearStreamingText();
     _state.extractionResults = results;
     completeTaskPlan();
     setChunkPhase(null);
@@ -458,6 +481,7 @@ export function resetExtraction(): void {
   _state.completedChunks = 0;
   _state.chunkPhase = null;
   resetTaskPlan();
+  clearStreamingText();
 }
 
 /**
@@ -545,5 +569,6 @@ export function resetFormatterState(): void {
   _state.completedChunks = 0;
   _state.chunkPhase = null;
   resetTaskPlan();
+  clearStreamingText();
   clearLocalStorage();
 }

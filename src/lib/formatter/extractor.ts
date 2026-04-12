@@ -27,6 +27,10 @@ export function parseChunkToGraph(markdown: string): Graph {
   return parseMarkdownToGraph(markdown);
 }
 
+export interface ExtractOptions {
+  onToken?: (token: string) => void;
+}
+
 /**
  * Extract relevant content from a chunk based on desired format.
  * Uses LLM to determine relevance and format output.
@@ -35,7 +39,8 @@ export async function extractFromChunk(
   chunk: string,
   desiredFormat: string,
   chunkIndex: number,
-  backend: FormatterBackend
+  backend: FormatterBackend,
+  options?: ExtractOptions
 ): Promise<ExtractionResult> {
   // First, check relevance using LLM
   const relevancePrompt = `You are a content extraction assistant. Your task is to:
@@ -82,6 +87,7 @@ Output only JSON, no other text:`;
   const response = await backend.generate(messages, {
     temperature: 0.3,
     maxTokens: 2048,
+    onToken: options?.onToken,
   });
 
   try {
@@ -137,7 +143,8 @@ Output only JSON, no other text:`;
 export async function extractFromGraph(
   graph: Graph,
   desiredFormat: string,
-  backend: FormatterBackend
+  backend: FormatterBackend,
+  options?: ExtractOptions
 ): Promise<ExtractionResult[]> {
   const results: ExtractionResult[] = [];
   const nodes = getOrderedNodes(graph);
@@ -151,7 +158,8 @@ export async function extractFromGraph(
         `## ${node.title}\n\n${node.content}`,
         desiredFormat,
         i,
-        backend
+        backend,
+        options
       );
       result.nodeId = node.id;
       result.title = node.title;
@@ -178,7 +186,8 @@ export async function extractFromGraph(
 export async function extractFromRawChunks(
   chunks: string[],
   desiredFormat: string,
-  backend: FormatterBackend
+  backend: FormatterBackend,
+  options?: ExtractOptions
 ): Promise<ExtractionResult[]> {
   const results: ExtractionResult[] = [];
   const concurrency = backend.recommendedConcurrency();
@@ -191,7 +200,7 @@ export async function extractFromRawChunks(
       const chunk = chunks[idx] ?? '';
       
       batch.push(
-        extractFromChunk(chunk, desiredFormat, idx, backend).catch(err => {
+        extractFromChunk(chunk, desiredFormat, idx, backend, options).catch(err => {
           logger.error(`Error extracting from chunk ${idx}:`, err);
           return {
             chunkId: idx,

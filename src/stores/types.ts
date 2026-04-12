@@ -129,4 +129,6 @@ export interface FormatterState {
   chunkPhase: string | null;     // current phase label like "Formatting 3/10"
   // Task plan for phase/step tracking
   taskPlan: TaskPlan;
+  // Streaming text for live token feedback
+  streamingText: string;
 }

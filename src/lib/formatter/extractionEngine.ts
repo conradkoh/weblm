@@ -34,13 +34,16 @@ export interface ExtractionEngineOptions {
   minRelevance?: RelevanceLevel;
   /** Timeout per extraction in ms */
   timeoutMs?: number;
+  /** Callback for streaming token feedback */
+  onToken?: (token: string) => void;
 }
 
-const DEFAULT_OPTIONS: Omit<Required<ExtractionEngineOptions>, 'backend'> & { backend: FormatterBackend } = {
+const DEFAULT_OPTIONS: Omit<ExtractionEngineOptions, 'backend'> & { backend: FormatterBackend } = {
   backend: new LocalFormatterBackend(),
   concurrency: 2,
   minRelevance: 'low',
   timeoutMs: 30000,
+  onToken: undefined,
 };
 
 /**
@@ -69,6 +72,7 @@ export async function processChunks(
   const results: ExtractionResult[] = [];
   const total = refinedChunks.length;
   const concurrency = opts.concurrency ?? effectiveBackend.recommendedConcurrency();
+  const onToken = opts.onToken; // Extract for use in closures
 
   try {
     // Phase 1: Parse chunks to graphs (if they contain markdown headers)
@@ -114,11 +118,11 @@ export async function processChunks(
           
           if (nodes.length > 1) {
             // Has multiple sections - use graph extraction
-            return await extractFromGraph(graph, desiredFormat, effectiveBackend);
+            return await extractFromGraph(graph, desiredFormat, effectiveBackend, { onToken });
           } else {
             const chunk = refinedChunks[chunkIndex] ?? '';
             // Single chunk - use direct extraction
-            return [await extractFromChunk(chunk, desiredFormat, chunkIndex, effectiveBackend)];
+            return [await extractFromChunk(chunk, desiredFormat, chunkIndex, effectiveBackend, { onToken })];
           }
         } catch (err) {
           logger.error(`Error extracting from chunk ${chunkIndex}:`, err);
@@ -154,7 +158,7 @@ export async function processChunks(
     });
 
     // Filter by minimum relevance
-    const filteredResults = filterByRelevance(results, opts.minRelevance);
+    const filteredResults = filterByRelevance(results, opts.minRelevance ?? 'low');
     logger.info(`Extraction complete: ${filteredResults.length} relevant of ${results.length} total`);
 
     return filteredResults;
