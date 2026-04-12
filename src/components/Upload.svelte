@@ -156,6 +156,7 @@
 {#if isDragging}
   <div
     class="fixed inset-0 bg-indigo-600/10 flex items-center justify-center z-[1000]"
+    role="region"
     aria-label="Drop zone for file upload"
     ondragover={handleDragOver}
     ondrop={handleDrop}
