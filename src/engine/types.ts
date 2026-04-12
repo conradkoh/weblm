@@ -21,6 +21,18 @@ export type ModelState =
   | 'error';
 
 /**
+ * Per-file progress entry (for debugging / development display).
+ */
+export interface FileProgress {
+  file: string;
+  phase: 'downloading' | 'loading';
+  progress: number;
+  message: string;
+  loadedBytes?: number;
+  totalBytes?: number;
+}
+
+/**
  * Model loading progress information.
  * This wraps WebLLM's InitProgressReport.
  */
@@ -33,6 +45,8 @@ export interface ModelProgress {
   message: string;
   /** Time elapsed in seconds */
   timeElapsed?: number;
+  /** All tracked files (populated by ProgressAggregator for concurrent downloads) */
+  files?: FileProgress[];
 }
 
 /**
