@@ -9,6 +9,14 @@
   import { exportChatAsText, exportChatAsMarkdown } from '../app/export';
   import type { ChatMessage } from '../types';
   import type { Theme } from '../stores/types';
+  import * as Dialog from '$ui/dialog';
+  import { Slider } from '$ui/slider';
+  import { Switch } from '$ui/switch';
+  import * as RadioGroup from '$ui/radio-group';
+  import { Label } from '$ui/label';
+  import { Textarea } from '$ui/textarea';
+  import { Button } from '$ui/button';
+  import { Separator } from '$ui/separator';
 
   interface Props {
     open: boolean;
@@ -44,109 +52,125 @@
     applySettings({ temperature, maxTokens, topP, systemPrompt, theme, showMetrics });
     onClose();
   }
-
-  function handleOverlayClick(event: MouseEvent): void {
-    if ((event.target as HTMLElement).classList.contains('settings-overlay')) {
-      onClose();
-    }
-  }
 </script>
 
-{#if open}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div
-    class="settings-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="settings-title"
-    onclick={handleOverlayClick}
-  >
-    <div class="bg-white dark:bg-slate-900 rounded-lg shadow-md max-w-[500px] w-[90%] max-h-[80vh] overflow-y-auto">
-      <!-- Header -->
-      <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
-        <h2 id="settings-title" class="m-0 text-lg font-semibold text-gray-900 dark:text-slate-100">Settings</h2>
-        <button
-          class="flex items-center justify-center w-8 h-8 p-0 bg-transparent border-none rounded-lg cursor-pointer text-gray-500 dark:text-slate-400 text-base transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100"
-          aria-label="Close settings"
-          onclick={onClose}
-        >✕</button>
+<Dialog.Root
+  {open}
+  onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}
+>
+  <Dialog.Content class="max-w-[500px] w-[90%] max-h-[85vh] overflow-y-auto">
+    <Dialog.Header>
+      <Dialog.Title>Settings</Dialog.Title>
+    </Dialog.Header>
+
+    <!-- Content -->
+    <div class="flex flex-col gap-6 py-2">
+
+      <!-- Generation Parameters -->
+      <div class="flex flex-col gap-3">
+        <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Generation</h3>
+
+        <div class="flex flex-col gap-1">
+          <Label for="temp-slider">Temperature: {temperature.toFixed(2)}</Label>
+          <Slider
+            id="temp-slider"
+            type="single"
+            min={0}
+            max={2}
+            step={0.05}
+            bind:value={temperature}
+            class="w-full"
+          />
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <Label for="tokens-slider">Max Tokens: {maxTokens}</Label>
+          <Slider
+            id="tokens-slider"
+            type="single"
+            min={256}
+            max={8192}
+            step={256}
+            bind:value={maxTokens}
+            class="w-full"
+          />
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <Label for="topp-slider">Top-P: {topP.toFixed(2)}</Label>
+          <Slider
+            id="topp-slider"
+            type="single"
+            min={0}
+            max={1}
+            step={0.05}
+            bind:value={topP}
+            class="w-full"
+          />
+        </div>
       </div>
 
-      <!-- Content -->
-      <div class="p-4 flex flex-col gap-6">
+      <Separator />
 
-        <!-- Generation Parameters -->
-        <div class="flex flex-col gap-2">
-          <h3 class="m-0 text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider">Generation</h3>
-          <label class="flex flex-col gap-1 text-sm text-gray-900 dark:text-slate-100">
-            Temperature: {temperature.toFixed(2)}
-            <input type="range" min="0" max="2" step="0.05" bind:value={temperature} class="w-full" />
-          </label>
-          <label class="flex flex-col gap-1 text-sm text-gray-900 dark:text-slate-100">
-            Max Tokens: {maxTokens}
-            <input type="range" min="256" max="8192" step="256" bind:value={maxTokens} class="w-full" />
-          </label>
-          <label class="flex flex-col gap-1 text-sm text-gray-900 dark:text-slate-100">
-            Top-P: {topP.toFixed(2)}
-            <input type="range" min="0" max="1" step="0.05" bind:value={topP} class="w-full" />
-          </label>
-        </div>
-
-        <!-- System Prompt -->
-        <div class="flex flex-col gap-2">
-          <h3 class="m-0 text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider">System Prompt</h3>
-          <textarea
-            class="w-full px-3 py-2 text-sm font-[inherit] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg resize-y outline-none transition-[border-color] duration-150 focus:border-indigo-600 dark:focus:border-indigo-400"
-            rows={4}
-            placeholder="Enter system prompt..."
-            bind:value={systemPrompt}
-          ></textarea>
-        </div>
-
-        <!-- Theme -->
-        <div class="flex flex-col gap-2">
-          <h3 class="m-0 text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider">Theme</h3>
-          <div class="flex gap-4">
-            {#each ['light', 'dark', 'system'] as t (t)}
-              <label class="flex items-center gap-1 text-sm cursor-pointer text-gray-900 dark:text-slate-100">
-                <input type="radio" name="theme" value={t} bind:group={theme} />
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </label>
-            {/each}
-          </div>
-        </div>
-
-        <!-- Metrics -->
-        <div class="flex flex-col gap-2">
-          <h3 class="m-0 text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider">Performance</h3>
-          <label class="flex items-center gap-2 text-sm cursor-pointer text-gray-900 dark:text-slate-100">
-            <input type="checkbox" bind:checked={showMetrics} />
-            Show generation metrics
-          </label>
-        </div>
-
-        <!-- Export -->
-        <div class="flex flex-col gap-2">
-          <h3 class="m-0 text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider">Export Chat</h3>
-          <div class="flex gap-2 flex-wrap">
-            <button class="btn btn-secondary" onclick={() => exportChatAsText(messages)}>
-              Export as Text
-            </button>
-            <button class="btn btn-secondary" onclick={() => exportChatAsMarkdown(messages)}>
-              Export as Markdown
-            </button>
-          </div>
-        </div>
-
+      <!-- System Prompt -->
+      <div class="flex flex-col gap-2">
+        <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System Prompt</h3>
+        <Label for="system-prompt" class="sr-only">System Prompt</Label>
+        <Textarea
+          id="system-prompt"
+          rows={4}
+          placeholder="Enter system prompt..."
+          bind:value={systemPrompt}
+          class="resize-y min-h-[96px]"
+        />
       </div>
 
-      <!-- Footer -->
-      <div class="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-slate-700">
-        <button class="btn btn-secondary" onclick={onClose}>Cancel</button>
-        <button class="btn" onclick={handleSave}>Save</button>
+      <Separator />
+
+      <!-- Theme -->
+      <div class="flex flex-col gap-2">
+        <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Theme</h3>
+        <RadioGroup.Root bind:value={theme} class="flex flex-row gap-4">
+          {#each (['light', 'dark', 'system'] as Theme[]) as t (t)}
+            <div class="flex items-center gap-2">
+              <RadioGroup.Item value={t} id="theme-{t}" />
+              <Label for="theme-{t}" class="cursor-pointer capitalize">{t}</Label>
+            </div>
+          {/each}
+        </RadioGroup.Root>
       </div>
+
+      <Separator />
+
+      <!-- Metrics Toggle -->
+      <div class="flex flex-col gap-2">
+        <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Performance</h3>
+        <div class="flex items-center gap-2">
+          <Switch id="show-metrics" bind:checked={showMetrics} />
+          <Label for="show-metrics" class="cursor-pointer">Show generation metrics</Label>
+        </div>
+      </div>
+
+      <Separator />
+
+      <!-- Export -->
+      <div class="flex flex-col gap-2">
+        <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Export Chat</h3>
+        <div class="flex gap-2 flex-wrap">
+          <Button variant="outline" onclick={() => exportChatAsText(messages)}>
+            Export as Text
+          </Button>
+          <Button variant="outline" onclick={() => exportChatAsMarkdown(messages)}>
+            Export as Markdown
+          </Button>
+        </div>
+      </div>
+
     </div>
-  </div>
-{/if}
+
+    <Dialog.Footer>
+      <Button variant="outline" onclick={onClose}>Cancel</Button>
+      <Button onclick={handleSave}>Save</Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
