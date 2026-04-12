@@ -15,7 +15,6 @@
     getStorageInfo,
   } from '../stores/engineStore.svelte';
   import { DEFAULT_MODEL_ID } from '../config';
-  import { logger } from '../logger';
 
   interface Props {
     onModelLoaded: (modelId: string) => void;
