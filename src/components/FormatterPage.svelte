@@ -578,6 +578,29 @@
     </div>
   </div>
 
+  <!-- Streaming text panel (shown while processing with streaming tokens) -->
+  {#if formatterState.isProcessing && formatterState.streamingText}
+    {@const displayText = formatterState.streamingText.length > 500 
+      ? '...' + formatterState.streamingText.slice(-500) 
+      : formatterState.streamingText}
+    <div class="px-4 py-3 bg-slate-900 dark:bg-black flex-shrink-0 max-h-32 overflow-hidden">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-xs font-medium text-slate-400">
+          ✏️ Model generating...
+        </span>
+        <span class="text-xs text-slate-500">
+          {formatterState.streamingText.length} chars
+        </span>
+      </div>
+      <div 
+        class="font-mono text-xs text-green-400 dark:text-green-300 whitespace-pre-wrap overflow-hidden max-h-20"
+        style="word-break: break-all;"
+      >
+        {displayText}<span class="animate-pulse">▊</span>
+      </div>
+    </div>
+  {/if}
+
   <!-- Progress bar (shown while processing) -->
   {#if formatterState.isProcessing && formatterState.taskPlan.status === 'running'}
     {@const plan = formatterState.taskPlan}
