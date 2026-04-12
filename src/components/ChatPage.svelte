@@ -2,203 +2,57 @@
   /**
    * ChatPage component.
    * Full chat experience: header, message list, input, upload, settings.
-   * Handles the complete send → stream → display → save flow.
+   * All chat state and logic lives in chatStore — this component is a thin view layer.
    */
 
   import ChatMessages from './ChatMessages.svelte';
   import MessageInput from './MessageInput.svelte';
-  import Upload, { type UploadedFile } from './Upload.svelte';
-  import Metrics, { type GenerationMetrics } from './Metrics.svelte';
+  import Upload from './Upload.svelte';
+  import Metrics from './Metrics.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
-  import { sendMessage, stopGeneration, unloadEngine, getCurrentModel, getIsGenerating } from '../engine/index';
-  import { initializeEngine } from '../engine/index';
-  import { loadChatMessages, saveChatMessages, clearChatMessages } from '../storage/idb';
-  import { getTemperature, getMaxTokens, getTopP, getSystemPrompt, getShowMetrics } from '../settings';
-  import { getModelInfo, DEFAULT_MODEL_ID } from '../config';
-  import { logger } from '../logger';
-  import type { ChatMessage } from '../types';
-  import { generateId } from '../types';
+  import {
+    getChatState,
+    loadHistory,
+    clearChat,
+    sendMessage,
+    stopGeneration,
+    setUploadedFile,
+    clearUploadedFile,
+  } from '../stores/chatStore.svelte';
+  import { getEngineState } from '../stores/engineStore.svelte';
 
   interface Props {
     modelId: string;
-    onModelSwitch?: (newModelId: string, displayName: string) => void;
   }
 
-  let { modelId, onModelSwitch }: Props = $props();
+  let { modelId }: Props = $props();
 
-  // Chat state
-  let messages: ChatMessage[] = $state([]);
-  let isGenerating = $state(false);
-  let uploadedFile: UploadedFile | null = $state(null);
-  let lastMetrics: GenerationMetrics | null = $state(null);
+  const chatState = getChatState();
+  const engineState = getEngineState();
+
+  // UI-only state (not in stores)
   let showSettings = $state(false);
   let inputRef: MessageInput | undefined = $state();
 
-  // Model display name
-  const modelDisplayName = $derived(getModelInfo(modelId)?.displayName ?? modelId);
+  // Model display name from engine store
+  const modelDisplayName = $derived(engineState.modelDisplayName ?? modelId);
 
-  // Load chat history on mount
+  // Load history on mount
   $effect(() => {
     loadHistory();
   });
 
-  async function loadHistory(): Promise<void> {
-    try {
-      const saved = await loadChatMessages();
-      if (saved && saved.length > 0) {
-        messages = saved;
-        logger.debug(`loaded ${saved.length} messages from history`);
-      }
-    } catch (err) {
-      logger.error('failed to load chat history:', err);
-    }
-  }
-
-  async function saveHistory(): Promise<void> {
-    try {
-      await saveChatMessages(messages);
-    } catch (err) {
-      logger.error('failed to save chat history:', err);
-    }
-  }
-
   async function handleNewChat(): Promise<void> {
-    messages = [];
-    try {
-      await clearChatMessages();
-    } catch (err) {
-      logger.error('failed to clear chat history:', err);
-    }
-    lastMetrics = null;
-    logger.info('chat cleared');
+    await clearChat();
   }
 
   async function handleSendMessage(userText: string): Promise<void> {
-    if (isGenerating) return;
-
-    // Add user message
-    const userMsg: ChatMessage = {
-      id: generateId(),
-      role: 'user',
-      content: userText,
-      timestamp: new Date().toISOString(),
-    };
-    messages = [...messages, userMsg];
-
-    isGenerating = true;
-
-    // Add streaming assistant placeholder
-    const assistantMsg: ChatMessage = {
-      id: generateId(),
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toISOString(),
-      streaming: true,
-    };
-    messages = [...messages, assistantMsg];
-
-    // Build context
-    let context: ChatMessage[] = messages.slice(0, -1); // all except placeholder
-
-    const systemPrompt = getSystemPrompt();
-    if (systemPrompt.trim()) {
-      context = [
-        { id: generateId(), role: 'system', content: systemPrompt.trim(), timestamp: new Date().toISOString() },
-        ...context,
-      ];
-    }
-
-    if (uploadedFile) {
-      context = [
-        {
-          id: generateId(),
-          role: 'system',
-          content: `The user has uploaded a file named "${uploadedFile.name}". Here is its content:\n\n${uploadedFile.content}`,
-          timestamp: new Date().toISOString(),
-        },
-        ...context,
-      ];
-      uploadedFile = null; // clear after use
-    }
-
-    const temperature = getTemperature();
-    const maxTokens = getMaxTokens();
-    const topP = getTopP();
-
-    // Metrics tracking
-    const generationStart = performance.now();
-    let firstTokenTime: number | null = null;
-    let tokenCount = 0;
-
-    try {
-      await sendMessage(
-        context,
-        (token) => {
-          if (firstTokenTime === null) firstTokenTime = performance.now();
-          tokenCount++;
-
-          // Update the streaming message content
-          messages = messages.map(m =>
-            m.id === assistantMsg.id
-              ? { ...m, content: m.content + token }
-              : m
-          );
-        },
-        (fullResponse) => {
-          // Complete the message
-          const endTime = performance.now();
-          const totalTime = endTime - generationStart;
-          const ttft = firstTokenTime ? firstTokenTime - generationStart : 0;
-          const tps = tokenCount > 0 && totalTime > 0 ? (tokenCount / totalTime) * 1000 : 0;
-
-          messages = messages.map(m =>
-            m.id === assistantMsg.id
-              ? { ...m, content: fullResponse, streaming: false }
-              : m
-          );
-
-          isGenerating = false;
-
-          if (getShowMetrics()) {
-            lastMetrics = { ttft, totalTime, tokenCount, tokensPerSecond: tps };
-          }
-
-          saveHistory();
-          inputRef?.focus();
-        },
-        (error) => {
-          logger.error('Generation error:', error);
-          messages = messages.map(m =>
-            m.id === assistantMsg.id
-              ? { ...m, content: `Error: ${error.message}`, streaming: false }
-              : m
-          );
-          isGenerating = false;
-          saveHistory();
-          inputRef?.focus();
-        },
-        { temperature, maxTokens, topP }
-      );
-    } catch (error) {
-      logger.error('Send message error:', error);
-      messages = messages.map(m =>
-        m.id === assistantMsg.id
-          ? { ...m, content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`, streaming: false }
-          : m
-      );
-      isGenerating = false;
-      saveHistory();
-      inputRef?.focus();
-    }
+    await sendMessage(userText);
+    inputRef?.focus();
   }
 
   function handleStopGeneration(): void {
     stopGeneration();
-    // Mark last streaming message as complete
-    messages = messages.map(m =>
-      m.streaming ? { ...m, streaming: false } : m
-    );
-    isGenerating = false;
     inputRef?.focus();
   }
 </script>
@@ -222,37 +76,26 @@
 
   <!-- Messages -->
   <div class="chat-messages-wrapper">
-    <ChatMessages {messages} />
+    <ChatMessages messages={chatState.messages} />
   </div>
 
   <!-- Metrics -->
-  {#if lastMetrics}
+  {#if chatState.lastMetrics}
     <div class="metrics-wrapper">
-      <Metrics metrics={lastMetrics} />
-    </div>
-  {/if}
-
-  <!-- File info (shown above input when file is attached) -->
-  {#if uploadedFile}
-    <div class="file-info-bar">
-      <Upload
-        {uploadedFile}
-        onFileLoaded={(f) => { uploadedFile = f; }}
-        onFileClear={() => { uploadedFile = null; }}
-      />
+      <Metrics metrics={chatState.lastMetrics} />
     </div>
   {/if}
 
   <!-- Input area -->
   <div class="input-area">
     <Upload
-      uploadedFile={null}
-      onFileLoaded={(f) => { uploadedFile = f; }}
-      onFileClear={() => { uploadedFile = null; }}
+      uploadedFile={chatState.uploadedFile}
+      onFileLoaded={(f) => setUploadedFile(f)}
+      onFileClear={() => clearUploadedFile()}
     />
     <div class="input-flex">
       <MessageInput
-        {isGenerating}
+        isGenerating={chatState.isGenerating}
         onSend={handleSendMessage}
         onStop={handleStopGeneration}
         bind:this={inputRef}
@@ -262,7 +105,11 @@
 </div>
 
 <!-- Settings panel -->
-<SettingsPanel open={showSettings} {messages} onClose={() => { showSettings = false; }} />
+<SettingsPanel
+  open={showSettings}
+  messages={chatState.messages}
+  onClose={() => { showSettings = false; }}
+/>
 
 <style>
   .chat-page {
@@ -347,11 +194,6 @@
 
   .metrics-wrapper {
     padding: 0 var(--spacing-md) var(--spacing-xs);
-    flex-shrink: 0;
-  }
-
-  .file-info-bar {
-    padding: 0 var(--spacing-md);
     flex-shrink: 0;
   }
 

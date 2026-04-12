@@ -4,12 +4,9 @@
    * Shows generation performance metrics (TTFT, tokens/sec, total time).
    */
 
-  export interface GenerationMetrics {
-    ttft: number;
-    totalTime: number;
-    tokenCount: number;
-    tokensPerSecond: number;
-  }
+  import type { GenerationMetrics } from '../stores/types';
+
+  export type { GenerationMetrics };
 
   interface Props {
     metrics?: GenerationMetrics | null;

@@ -4,15 +4,12 @@
    * File upload button with drag-and-drop overlay.
    */
 
+  import type { UploadedFile } from '../stores/types';
+
   const SUPPORTED_TYPES = ['.txt', '.md', '.csv', '.json'];
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-  export interface UploadedFile {
-    name: string;
-    content: string;
-    size: number;
-    type: string;
-  }
+  export type { UploadedFile };
 
   interface Props {
     uploadedFile?: UploadedFile | null;
