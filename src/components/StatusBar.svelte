@@ -1,35 +1,28 @@
 <script lang="ts">
   /**
    * StatusBar component.
-   * Displays WebGPU status, online/offline, model status, and offline-ready indicators.
+   * Reads WebGPU, online, model, and offline-ready status directly from stores.
    */
 
-  interface Props {
-    webgpuAvailable: boolean | null;
-    webgpuReason?: string;
-    online: boolean;
-    modelName: string | null;
-    modelLoading: boolean;
-    offlineReady: boolean;
-  }
+  import { getAppState } from '../stores/appStore.svelte';
+  import { getEngineState } from '../stores/engineStore.svelte';
 
-  let {
-    webgpuAvailable = null,
-    webgpuReason = '',
-    online = true,
-    modelName = null,
-    modelLoading = false,
-    offlineReady = false,
-  }: Props = $props();
+  const appState = getAppState();
+  const engineState = getEngineState();
 </script>
 
 <div class="status-bar" role="status" aria-live="polite" aria-label="Application status">
   <!-- WebGPU status -->
-  <div class="status-indicator" id="webgpu-status" aria-label="WebGPU status" title={webgpuAvailable === false ? (webgpuReason ?? 'WebGPU is not available') : ''}>
-    {#if webgpuAvailable === null}
+  <div
+    class="status-indicator"
+    id="webgpu-status"
+    aria-label="WebGPU status"
+    title={appState.webgpu.available === false ? (appState.webgpu.reason ?? 'WebGPU is not available') : ''}
+  >
+    {#if appState.webgpu.available === null}
       <span class="status-dot loading" aria-hidden="true"></span>
       <span>Checking WebGPU...</span>
-    {:else if webgpuAvailable}
+    {:else if appState.webgpu.available}
       <span class="status-dot success" aria-hidden="true"></span>
       <span>WebGPU Available</span>
     {:else}
@@ -40,12 +33,12 @@
 
   <!-- Online/offline status -->
   <div class="status-indicator" id="online-status" aria-label="Connection status">
-    <span class="status-dot {online ? 'success' : 'error'}" aria-hidden="true"></span>
-    <span>{online ? 'Online' : 'Offline'}</span>
+    <span class="status-dot {appState.online ? 'success' : 'error'}" aria-hidden="true"></span>
+    <span>{appState.online ? 'Online' : 'Offline'}</span>
   </div>
 
   <!-- Offline ready badge -->
-  {#if offlineReady}
+  {#if appState.offlineReady}
     <div class="status-indicator" id="offline-ready-status" title="App is cached and can work offline">
       <span class="status-dot success" aria-hidden="true"></span>
       <span>Offline Ready ✓</span>
@@ -53,14 +46,14 @@
   {/if}
 
   <!-- Model status -->
-  {#if modelLoading || modelName}
+  {#if engineState.status === 'loading' || engineState.status === 'ready'}
     <div class="status-indicator" id="model-status" aria-label="Model status">
-      {#if modelLoading}
+      {#if engineState.status === 'loading'}
         <span class="status-dot loading" aria-hidden="true"></span>
         <span>Loading model...</span>
-      {:else if modelName}
+      {:else}
         <span class="status-dot success" aria-hidden="true"></span>
-        <span>Model: {modelName}</span>
+        <span>Model: {engineState.modelDisplayName}</span>
       {/if}
     </div>
   {/if}
@@ -74,6 +67,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     background-color: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
   }
 
   .status-indicator {
@@ -90,13 +84,8 @@
     flex-shrink: 0;
   }
 
-  .status-dot.success {
-    background-color: var(--color-success);
-  }
-
-  .status-dot.error {
-    background-color: var(--color-error);
-  }
+  .status-dot.success { background-color: var(--color-success); }
+  .status-dot.error { background-color: var(--color-error); }
 
   .status-dot.loading {
     background-color: var(--color-text-secondary);

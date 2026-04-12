@@ -1,16 +1,21 @@
 <script lang="ts">
   /**
    * Launcher component.
-   * The model selection and loading screen shown on first visit.
+   * The model selection and loading screen.
+   * Reads loading/caching state from engineStore; selectedModelId is local UI state.
    */
 
   import ModelSelector from './ModelSelector.svelte';
   import ProgressBar from './ProgressBar.svelte';
-  import { checkModelCached, getStorageEstimate, getStorageStatus } from '../storage/index';
-  import { initializeEngine, deleteCachedModel, getCurrentModel } from '../engine/index';
-  import { getModelInfo, DEFAULT_MODEL_ID, getModelCatalog } from '../config';
+  import {
+    getEngineState,
+    loadModel,
+    deleteCachedModel,
+    refreshCachedModels,
+    getStorageInfo,
+  } from '../stores/engineStore.svelte';
+  import { DEFAULT_MODEL_ID } from '../config';
   import { logger } from '../logger';
-  import type { ModelProgress, ProgressCallback } from '../engine/types';
 
   interface Props {
     onModelLoaded: (modelId: string) => void;
@@ -18,81 +23,42 @@
 
   let { onModelLoaded }: Props = $props();
 
-  // State
+  const engineState = getEngineState();
+
+  // UI-only: which model is selected in the dropdown
   let selectedModelId = $state(DEFAULT_MODEL_ID);
-  let cachedModelIds = $state(new Set<string>());
-  let isLoading = $state(false);
-  let progress: ModelProgress | null = $state(null);
-  let loadError: string | null = $state(null);
   let storageStatus = $state('');
 
-  // Derived: button label
+  // Derived from engine store
+  const isLoading = $derived(engineState.status === 'loading');
+  const loadError = $derived(engineState.status === 'error' ? engineState.error : null);
+  const cachedModelIds = $derived(engineState.cachedModelIds);
+
   const loadButtonText = $derived(
     isLoading
-      ? (progress?.phase === 'downloading' ? 'Downloading...' : 'Loading...')
+      ? (engineState.progress?.phase === 'downloading' ? 'Downloading...' : 'Loading...')
       : cachedModelIds.has(selectedModelId)
         ? '✓ Cached — Load Instantly'
         : 'Download & Load'
   );
 
-  // Load storage status and cached model list on mount
+  // Initialize: load cached models and storage status
   $effect(() => {
-    getStorageStatus().then(s => { storageStatus = s; });
+    getStorageInfo().then(s => { storageStatus = s; });
     refreshCachedModels();
   });
 
-  async function refreshCachedModels(): Promise<void> {
-    const catalog = getModelCatalog();
-    const ids = new Set<string>();
-    await Promise.all(
-      catalog.map(async info => {
-        if (await checkModelCached(info.modelId)) ids.add(info.modelId);
-      })
-    );
-    cachedModelIds = ids;
-  }
-
   async function handleLoad(): Promise<void> {
     if (isLoading) return;
-    isLoading = true;
-    loadError = null;
-    progress = null;
 
-    const modelInfo = getModelInfo(selectedModelId);
-    const displayName = modelInfo?.displayName ?? selectedModelId;
-
-    // Check storage if not cached
-    if (!cachedModelIds.has(selectedModelId)) {
-      const storage = await getStorageEstimate();
-      const requiredSpace = (modelInfo?.vramMB ?? 0) * 1024 * 1024 * 1.5;
-      if (requiredSpace > 0 && storage.available < requiredSpace) {
-        const sizeStr = modelInfo?.sizeGB ? `${modelInfo.sizeGB} GB` : 'the model';
-        alert(
-          `Not enough storage space. Need ~${sizeStr}, but only ${Math.round(storage.available / 1024 / 1024 / 1024)}GB available.`
-        );
-        isLoading = false;
-        return;
-      }
-    }
-
-    const onProgress: ProgressCallback = (p) => {
-      progress = p;
-    };
-
-    try {
-      await initializeEngine(selectedModelId, onProgress);
-      isLoading = false;
+    const success = await loadModel(selectedModelId);
+    if (success) {
       onModelLoaded(selectedModelId);
-      logger.info(`Model ${selectedModelId} loaded successfully`);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Model loading failed:', msg);
-      loadError = `Failed to load model: ${msg}`;
-      isLoading = false;
     }
   }
 
   async function handleClearCache(): Promise<void> {
+    const { getModelInfo } = await import('../config');
     const info = getModelInfo(selectedModelId);
     const name = info?.displayName ?? selectedModelId;
     if (confirm(`Clear cache for ${name}? You'll need to download it again next time.`)) {
@@ -102,8 +68,6 @@
   }
 
   function handleRetry(): void {
-    loadError = null;
-    progress = null;
     handleLoad();
   }
 </script>
@@ -129,9 +93,13 @@
       onModelSelect={(id) => { selectedModelId = id; }}
     />
 
-    <!-- Progress bar (shown while loading) -->
+    <!-- Progress bar (shown while loading or on error) -->
     {#if isLoading || loadError}
-      <ProgressBar {progress} error={loadError} onRetry={loadError ? handleRetry : undefined} />
+      <ProgressBar
+        progress={engineState.progress}
+        error={loadError}
+        onRetry={loadError ? handleRetry : undefined}
+      />
     {/if}
 
     <!-- Action buttons -->
@@ -222,7 +190,7 @@
     font-weight: 600;
   }
 
-  /* Global button styles needed here (not scoped to component) */
+  /* Global button styles */
   :global(.button) {
     display: inline-flex;
     align-items: center;
@@ -241,27 +209,17 @@
     transition: background-color 0.15s ease, transform 0.1s ease;
   }
 
-  :global(.button:hover) {
-    background-color: #4338ca;
-  }
-
-  :global(.button:active) {
-    transform: scale(0.98);
-  }
-
+  :global(.button:hover) { background-color: #4338ca; }
+  :global(.button:active) { transform: scale(0.98); }
   :global(.button:disabled) {
     background-color: var(--color-text-secondary);
     cursor: not-allowed;
     opacity: 0.7;
   }
-
   :global(.button-secondary) {
     background-color: var(--color-surface);
     color: var(--color-text);
     border: 1px solid var(--color-border);
   }
-
-  :global(.button-secondary:hover) {
-    background-color: var(--color-border);
-  }
+  :global(.button-secondary:hover) { background-color: var(--color-border); }
 </style>
