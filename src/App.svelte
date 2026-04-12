@@ -10,7 +10,7 @@
   import StatusBar from './components/StatusBar.svelte';
   import Launcher from './components/Launcher.svelte';
   import ChatPage from './components/ChatPage.svelte';
-  import { getAppState, setScreen, init as appInit } from './stores/appStore.svelte';
+  import { getAppState, init as appInit } from './stores/appStore.svelte';
   import { getEngineState } from './stores/engineStore.svelte';
   import { WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
 
@@ -21,8 +21,8 @@
     appInit();
   });
 
-  function handleModelLoaded(modelId: string): void {
-    setScreen('chat');
+  function handleModelLoaded(_modelId: string): void {
+    // Engine store already called setScreen('chat') — nothing to do here
   }
 </script>
 

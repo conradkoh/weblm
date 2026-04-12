@@ -18,6 +18,9 @@ import {
 } from '../storage/index';
 import { getModelInfo, getModelCatalog } from '../config';
 import { logger } from '../logger';
+// Lazy store imports to avoid circular dependency issues at module load time
+import { setScreen } from './appStore.svelte';
+import { clearMessages } from './chatStore.svelte';
 
 // ─── State ────────────────────────────────────────────────────
 
@@ -139,6 +142,8 @@ export async function loadModel(modelId: string): Promise<boolean> {
       updateProgress(progress);
     });
     setModelReady(modelId, displayName);
+    // Notify app store: transition to chat screen
+    setScreen('chat');
     logger.info(`Model ${modelId} loaded successfully`);
     return true;
   } catch (error) {
@@ -166,6 +171,8 @@ export async function unloadModel(): Promise<void> {
 export async function switchModel(newModelId: string): Promise<boolean> {
   await unloadEngine();
   resetEngine();
+  // Clear chat messages when switching models
+  clearMessages();
   return loadModel(newModelId);
 }
 
