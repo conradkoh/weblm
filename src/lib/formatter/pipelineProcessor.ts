@@ -38,7 +38,7 @@ export interface PipelineResult {
 export async function processPipeline(
   chunks: string[],
   backend: FormatterBackend,
-  onProgress?: (progress: PipelineProgress) => void
+  onProgress?: (progress: PipelineProgress) => void | Promise<void>
 ): Promise<PipelineResult> {
   if (chunks.length === 0) {
     return { formattedChunks: [], analyses: [] };
@@ -75,7 +75,7 @@ export async function processPipeline(
         formattedCount++;
       }
       
-      onProgress?.({
+      await onProgress?.({
         phase: 'formatting',
         formatted: formattedCount,
         analyzed: analyzedCount,
@@ -112,7 +112,7 @@ export async function processPipeline(
           analyzedCount++;
         }
         
-        onProgress?.({
+        await onProgress?.({
           phase: 'analyzing',
           formatted: formattedCount,
           analyzed: analyzedCount,
@@ -142,7 +142,7 @@ export async function processPipeline(
     formattedChunks[0] = await formatChunkToMarkdown(chunks[0]!, backend);
     formattedCount = 1;
     
-    onProgress?.({
+    await onProgress?.({
       phase: 'formatting',
       formatted: 1,
       analyzed: 0,
@@ -156,7 +156,7 @@ export async function processPipeline(
       formattedChunks[i] = await formatChunkToMarkdown(chunks[i]!, backend);
       formattedCount++;
       
-      onProgress?.({
+      await onProgress?.({
         phase: 'formatting',
         formatted: formattedCount,
         analyzed: analyzedCount,
@@ -173,7 +173,7 @@ export async function processPipeline(
         analyses.push(analysis);
         analyzedCount++;
         
-        onProgress?.({
+        await onProgress?.({
           phase: 'analyzing',
           formatted: formattedCount,
           analyzed: analyzedCount,
@@ -187,7 +187,7 @@ export async function processPipeline(
   // Filter out undefined chunks and return results
   const validChunks = formattedChunks.filter((chunk): chunk is string => chunk !== undefined);
   
-  onProgress?.({
+  await onProgress?.({
     phase: 'complete',
     formatted: formattedCount,
     analyzed: analyzedCount,

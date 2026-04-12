@@ -80,6 +80,18 @@ export type RefinementState = 'idle' | 'chunking' | 'formatting' | 'analyzing' |
 
 export type ExtractionState = 'idle' | 'parsing' | 'extracting' | 'complete' | 'error';
 
+export interface TaskPhase {
+  name: string;         // e.g., "Formatting", "Analyzing", "Refining"
+  totalSteps: number;   // total steps in this phase (e.g., number of chunks)
+  completedSteps: number;
+}
+
+export interface TaskPlan {
+  phases: TaskPhase[];
+  currentPhaseIndex: number;  // 0-based
+  status: 'idle' | 'running' | 'complete' | 'error';
+}
+
 export type RelevanceLevel = 'high' | 'medium' | 'low' | 'none';
 
 export interface ExtractionResult {
@@ -111,4 +123,10 @@ export interface FormatterState {
   useWorkerPool: boolean;
   workerPoolSize: number;  // 1-4, default 2
   workerModelId: string;   // model to load in workers
+  // Chunk progress tracking
+  totalChunks: number;           // total chunks detected
+  completedChunks: number;       // chunks completed so far
+  chunkPhase: string | null;     // current phase label like "Formatting 3/10"
+  // Task plan for phase/step tracking
+  taskPlan: TaskPlan;
 }

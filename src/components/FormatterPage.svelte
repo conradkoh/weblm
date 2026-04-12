@@ -29,10 +29,27 @@
     setWorkerPoolSize,
     setWorkerModelId,
   } from '../stores/formatterStore.svelte';
+  import { getChunkCount } from '../lib/formatter/chunker';
   import type { ExtractionResult } from '../stores/types';
 
   const formatterState = getFormatterState();
   const engineState = getEngineState();
+
+  // Derived: estimated chunk count from source content
+  const estimatedChunkCount = $derived(
+    formatterState.sourceContent.trim()
+      ? getChunkCount(formatterState.sourceContent, { chunkSize: 800 })
+      : 0
+  );
+
+  // Load model button state
+  let isLoadingModel = $state(false);
+
+  // Derived: check if the selected model is already loaded
+  const modelLoaded = $derived(
+    formatterState.selectedModelId !== null && 
+    engineState.currentModelId === formatterState.selectedModelId
+  );
 
   // Load persisted data on mount
   $effect(() => {
@@ -64,37 +81,31 @@
     setScreen('launcher-home');
   }
 
-  async function handleRefineSource(): Promise<void> {
-    if (!formatterState.selectedModelId) {
-      alert('Please select a model first to process the content.');
-      return;
+  async function handleLoadModel(): Promise<void> {
+    if (!formatterState.selectedModelId) return;
+    isLoadingModel = true;
+    try {
+      await loadModel(formatterState.selectedModelId, { skipScreenTransition: true });
+    } catch (e) {
+      alert('Failed to load model. Please try again.');
+    } finally {
+      isLoadingModel = false;
     }
-    
-    // Load model if different from currently loaded
-    if (engineState.currentModelId !== formatterState.selectedModelId) {
-      const success = await loadModel(formatterState.selectedModelId, { skipScreenTransition: true });
-      if (!success) {
-        alert('Failed to load the selected model. Please try again.');
-        return;
-      }
+  }
+
+  async function handleRefineSource(): Promise<void> {
+    if (!formatterState.selectedModelId || engineState.currentModelId !== formatterState.selectedModelId) {
+      alert('Please load a model first by clicking the ▶ Load button.');
+      return;
     }
     
     await runRefinement();
   }
 
   async function handleRunExtraction(): Promise<void> {
-    if (!formatterState.selectedModelId) {
-      alert('Please select a model first to extract content.');
+    if (!formatterState.selectedModelId || engineState.currentModelId !== formatterState.selectedModelId) {
+      alert('Please load a model first by clicking the ▶ Load button.');
       return;
-    }
-    
-    // Load model if different from currently loaded
-    if (engineState.currentModelId !== formatterState.selectedModelId) {
-      const success = await loadModel(formatterState.selectedModelId, { skipScreenTransition: true });
-      if (!success) {
-        alert('Failed to load the selected model. Please try again.');
-        return;
-      }
     }
     
     await runExtraction();
@@ -283,11 +294,29 @@
   <!-- Model Selector Row -->
   <div class="px-4 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
     <div class="max-w-2xl mx-auto">
-      <ModelSelector
-        cachedModelIds={engineState.cachedModelIds}
-        selectedModelId={formatterState.selectedModelId ?? ''}
-        onModelSelect={handleModelSelect}
-      />
+      <div class="flex items-center gap-2">
+        <div class="flex-1">
+          <ModelSelector
+            cachedModelIds={engineState.cachedModelIds}
+            selectedModelId={formatterState.selectedModelId ?? ''}
+            onModelSelect={handleModelSelect}
+          />
+        </div>
+        <Button
+          size="sm"
+          variant={modelLoaded ? "outline" : "default"}
+          onclick={handleLoadModel}
+          disabled={!formatterState.selectedModelId || isLoadingModel}
+        >
+          {#if isLoadingModel}
+            ⏳
+          {:else if modelLoaded}
+            ✓ Loaded
+          {:else}
+            ▶ Load
+          {/if}
+        </Button>
+      </div>
     </div>
   </div>
   <Separator />
@@ -376,9 +405,16 @@
     <!-- Source Column -->
     <div class="flex flex-col gap-2 min-h-0">
       <div class="flex items-center justify-between">
-        <label for="source-input" class="font-semibold text-sm text-gray-700 dark:text-slate-300">
-          Source
-        </label>
+        <div class="flex flex-col">
+          <label for="source-input" class="font-semibold text-sm text-gray-700 dark:text-slate-300">
+            Source
+          </label>
+          {#if estimatedChunkCount > 0}
+            <span class="text-xs text-gray-500 dark:text-slate-500">
+              ~{estimatedChunkCount} chunks
+            </span>
+          {/if}
+        </div>
         <Button
           variant="default"
           size="sm"
@@ -543,22 +579,44 @@
   </div>
 
   <!-- Progress bar (shown while processing) -->
-  {#if formatterState.isProcessing}
+  {#if formatterState.isProcessing && formatterState.taskPlan.status === 'running'}
+    {@const plan = formatterState.taskPlan}
+    {@const currentPhase = plan.phases[plan.currentPhaseIndex]}
+    {@const totalPhases = plan.phases.length}
+    {@const phaseNum = plan.currentPhaseIndex + 1}
     <div class="px-4 py-3 bg-gray-100 dark:bg-slate-800/80 flex-shrink-0">
+      <!-- Phase indicator -->
       <div class="flex items-center justify-between mb-1">
-        <span class="text-xs text-gray-600 dark:text-slate-400">
-          {formatterState.currentPhase ?? 'Processing...'}
+        <span class="text-xs font-medium text-gray-700 dark:text-slate-300">
+          Phase {phaseNum} of {totalPhases}: {currentPhase?.name ?? 'Processing'}
         </span>
         <span class="text-xs text-gray-500 dark:text-slate-500">
-          {formatterState.extractionState !== 'idle' ? formatterState.extractionState : formatterState.refinementState}
+          Step {currentPhase?.completedSteps ?? 0} of {currentPhase?.totalSteps ?? 0}
         </span>
       </div>
+      <!-- Progress bar -->
       <div class="w-full h-2 rounded-full bg-gray-300 dark:bg-slate-600 overflow-hidden">
         <div 
           class="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all duration-300"
-          style="width: {formatterState.extractionState !== 'idle' ? 50 : getRefinementProgress()}%"
+          style="width: {currentPhase && currentPhase.totalSteps > 0 ? Math.round((currentPhase.completedSteps / currentPhase.totalSteps) * 100) : 0}%"
         ></div>
       </div>
+      <!-- Overall progress dots -->
+      <div class="flex items-center gap-1 mt-2">
+        {#each plan.phases as phase, i}
+          <div class="flex items-center gap-1">
+            <div class="w-2 h-2 rounded-full {i < plan.currentPhaseIndex ? 'bg-green-500' : i === plan.currentPhaseIndex ? 'bg-indigo-500 animate-pulse' : 'bg-gray-300 dark:bg-slate-600'}"></div>
+            <span class="text-xs {i === plan.currentPhaseIndex ? 'text-gray-700 dark:text-slate-300' : 'text-gray-400 dark:text-slate-500'}">{phase.name}</span>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {:else if formatterState.isProcessing}
+    <!-- Fallback for processing without plan (e.g., during chunking before plan is created) -->
+    <div class="px-4 py-3 bg-gray-100 dark:bg-slate-800/80 flex-shrink-0">
+      <span class="text-xs text-gray-600 dark:text-slate-400">
+        {formatterState.currentPhase ?? 'Processing...'}
+      </span>
     </div>
   {:else if formatterState.extractionState === 'complete' && formatterState.extractionResults.length > 0}
     <div class="px-4 py-2 bg-green-50 dark:bg-green-900/20 text-sm text-green-700 dark:text-green-400 flex-shrink-0">
