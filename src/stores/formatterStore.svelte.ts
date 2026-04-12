@@ -51,6 +51,9 @@ const _state = $state<FormatterState>({
   streamingText: '',
   // Cache: hash of source content to detect unchanged content
   sourceContentHash: null,
+  // Timing metrics for runs
+  runStartedAt: null,
+  runCompletedAt: null,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -154,16 +157,36 @@ export function setChunkPhase(phase: string | null): void {
 
 // Task Plan functions for phase/step tracking
 export function initTaskPlan(phases: Array<{ name: string; totalSteps: number }>): void {
+  const now = Date.now();
   _state.taskPlan = {
-    phases: phases.map(p => ({ ...p, completedSteps: 0 })),
+    phases: phases.map(p => ({ ...p, completedSteps: 0, startedAt: now })),
     currentPhaseIndex: 0,
     status: 'running',
   };
 }
 
 export function advancePhase(): void {
-  if (_state.taskPlan.currentPhaseIndex < _state.taskPlan.phases.length - 1) {
+  const phases = _state.taskPlan.phases;
+  const currentIndex = _state.taskPlan.currentPhaseIndex;
+  const now = Date.now();
+  
+  // Mark current phase as completed
+  if (currentIndex < phases.length) {
+    const currentPhase = phases[currentIndex];
+    if (currentPhase) {
+      currentPhase.completedAt = now;
+      currentPhase.durationMs = now - (currentPhase.startedAt ?? now);
+    }
+  }
+  
+  // Move to next phase
+  if (currentIndex < phases.length - 1) {
     _state.taskPlan.currentPhaseIndex++;
+    // Mark next phase as started
+    const nextPhase = phases[currentIndex + 1];
+    if (nextPhase) {
+      nextPhase.startedAt = now;
+    }
   }
 }
 
@@ -175,6 +198,19 @@ export function updatePhaseProgress(completedSteps: number): void {
 }
 
 export function completeTaskPlan(): void {
+  const phases = _state.taskPlan.phases;
+  const currentIndex = _state.taskPlan.currentPhaseIndex;
+  const now = Date.now();
+  
+  // Mark current phase as completed
+  if (currentIndex < phases.length) {
+    const currentPhase = phases[currentIndex];
+    if (currentPhase) {
+      currentPhase.completedAt = now;
+      currentPhase.durationMs = now - (currentPhase.startedAt ?? now);
+    }
+  }
+  
   _state.taskPlan.status = 'complete';
 }
 
@@ -247,6 +283,8 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
   _state.isProcessing = true;
   _state.errorMessage = null;
   _state.refinedChunks = [];
+  _state.runStartedAt = Date.now();
+  _state.runCompletedAt = null;
 
   try {
     // Step 0: Check cache - skip processing if content unchanged and we have cached results
@@ -255,6 +293,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       const currentHash = computeContentHash(sourceContent);
       if (currentHash === _state.sourceContentHash) {
         // Content unchanged, use cached results
+        _state.runCompletedAt = Date.now();
         setRefinementState('complete');
         setCurrentPhase(`Using cached refinement (${_state.refinedChunks.length} chunks)`);
         logger.info(`Refinement: Using cached results (${_state.refinedChunks.length} chunks)`);
@@ -369,6 +408,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       _state.refinedChunks = validChunks;
       // Store content hash for cache
       _state.sourceContentHash = computeContentHash(sourceContent);
+      _state.runCompletedAt = Date.now();
       updatePhaseProgress(1);
       completeTaskPlan();
       setRefinementState('complete');
@@ -379,6 +419,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       _state.refinedChunks = formattedChunks;
       // Store content hash for cache
       _state.sourceContentHash = computeContentHash(sourceContent);
+      _state.runCompletedAt = Date.now();
       updatePhaseProgress(1);
       completeTaskPlan();
       setRefinementState('complete');
@@ -387,6 +428,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
     }
 
   } catch (err) {
+    _state.runCompletedAt = Date.now();
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     logger.error('Refinement error:', err);
     setErrorMessage(errorMsg);
@@ -409,6 +451,8 @@ export function resetRefinement(): void {
   _state.totalChunks = 0;
   _state.completedChunks = 0;
   _state.chunkPhase = null;
+  _state.runStartedAt = null;
+  _state.runCompletedAt = null;
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();
@@ -441,6 +485,8 @@ export async function runExtraction(): Promise<void> {
   _state.isProcessing = true;
   _state.errorMessage = null;
   _state.extractionResults = [];
+  _state.runStartedAt = Date.now();
+  _state.runCompletedAt = null;
   
   // Initialize task plan with 2 phases based on refined chunk count
   // Extraction has 2 phases: Parsing (N steps), Extracting (N steps)
@@ -497,6 +543,7 @@ export async function runExtraction(): Promise<void> {
 
     clearStreamingText();
     _state.extractionResults = results;
+    _state.runCompletedAt = Date.now();
     completeTaskPlan();
     setChunkPhase(null);
     setExtractionState('complete');
@@ -511,6 +558,7 @@ export async function runExtraction(): Promise<void> {
     setOutputResults(outputContent);
 
   } catch (err) {
+    _state.runCompletedAt = Date.now();
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     logger.error('Extraction error:', err);
     setErrorMessage(errorMsg);
@@ -532,6 +580,8 @@ export function resetExtraction(): void {
   _state.totalChunks = 0;
   _state.completedChunks = 0;
   _state.chunkPhase = null;
+  _state.runStartedAt = null;
+  _state.runCompletedAt = null;
   resetTaskPlan();
   clearStreamingText();
 }
@@ -620,6 +670,8 @@ export function resetFormatterState(): void {
   _state.totalChunks = 0;
   _state.completedChunks = 0;
   _state.chunkPhase = null;
+  _state.runStartedAt = null;
+  _state.runCompletedAt = null;
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();

@@ -84,6 +84,10 @@ export interface TaskPhase {
   name: string;         // e.g., "Formatting", "Analyzing", "Refining"
   totalSteps: number;   // total steps in this phase (e.g., number of chunks)
   completedSteps: number;
+  // Timing metrics
+  startedAt?: number;      // timestamp when phase started (ms)
+  completedAt?: number;     // timestamp when phase completed (ms)
+  durationMs?: number;      // calculated duration in ms
 }
 
 export interface TaskPlan {
@@ -133,4 +137,7 @@ export interface FormatterState {
   streamingText: string;
   // Cache: hash of source content to detect unchanged content
   sourceContentHash: string | null;
+  // Timing metrics for runs
+  runStartedAt: number | null;     // timestamp when current/last run started
+  runCompletedAt: number | null;    // timestamp when current/last run completed
 }

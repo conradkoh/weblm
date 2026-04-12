@@ -56,6 +56,40 @@
     loadFromLocalStorage();
   });
 
+  // Live elapsed timer during processing
+  let elapsedSeconds = $state(0);
+  $effect(() => {
+    if (formatterState.isProcessing && formatterState.runStartedAt) {
+      // Update every second
+      const interval = setInterval(() => {
+        elapsedSeconds = Math.floor((Date.now() - formatterState.runStartedAt!) / 1000);
+      }, 1000);
+      
+      // Initial update
+      elapsedSeconds = Math.floor((Date.now() - formatterState.runStartedAt!) / 1000);
+      
+      // Cleanup on stop
+      return () => clearInterval(interval);
+    } else {
+      elapsedSeconds = 0;
+    }
+  });
+  
+  // Format duration helper
+  function formatDuration(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes < 60) {
+      return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  }
+
   function handleSourceChange(e: Event): void {
     const target = e.target as HTMLTextAreaElement;
     setSourceContent(target.value);
@@ -626,7 +660,7 @@
           Phase {phaseNum} of {totalPhases}: {currentPhase?.name ?? 'Processing'}
         </span>
         <span class="text-xs text-gray-500 dark:text-slate-500">
-          Step {currentPhase?.completedSteps ?? 0} of {currentPhase?.totalSteps ?? 0}
+          Running... {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
         </span>
       </div>
       <!-- Progress bar -->
@@ -642,6 +676,9 @@
           <div class="flex items-center gap-1">
             <div class="w-2 h-2 rounded-full {i < plan.currentPhaseIndex ? 'bg-green-500' : i === plan.currentPhaseIndex ? 'bg-indigo-500 animate-pulse' : 'bg-gray-300 dark:bg-slate-600'}"></div>
             <span class="text-xs {i === plan.currentPhaseIndex ? 'text-gray-700 dark:text-slate-300' : 'text-gray-400 dark:text-slate-500'}">{phase.name}</span>
+            {#if phase.durationMs}
+              <span class="text-xs text-gray-400 dark:text-slate-600">{formatDuration(phase.durationMs)}</span>
+            {/if}
           </div>
         {/each}
       </div>
@@ -649,17 +686,28 @@
   {:else if formatterState.isProcessing}
     <!-- Fallback for processing without plan (e.g., during chunking before plan is created) -->
     <div class="px-4 py-3 bg-gray-100 dark:bg-slate-800/80 flex-shrink-0">
-      <span class="text-xs text-gray-600 dark:text-slate-400">
-        {formatterState.currentPhase ?? 'Processing...'}
-      </span>
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-gray-600 dark:text-slate-400">
+          {formatterState.currentPhase ?? 'Processing...'}
+        </span>
+        <span class="text-xs text-gray-500 dark:text-slate-500">
+          Running... {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
+        </span>
+      </div>
     </div>
   {:else if formatterState.extractionState === 'complete' && formatterState.extractionResults.length > 0}
     <div class="px-4 py-2 bg-green-50 dark:bg-green-900/20 text-sm text-green-700 dark:text-green-400 flex-shrink-0">
       ✓ Extraction complete — {relevantCount} of {formatterState.extractionResults.length} results relevant
+      {#if formatterState.runCompletedAt && formatterState.runStartedAt}
+        <span class="ml-2 text-xs opacity-70">({formatDuration(formatterState.runCompletedAt - formatterState.runStartedAt)})</span>
+      {/if}
     </div>
   {:else if formatterState.refinementState === 'complete' && formatterState.refinedChunks.length > 0}
     <div class="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-400 flex-shrink-0">
       ✓ {formatterState.currentPhase?.includes('cached') ? formatterState.currentPhase : `Refinement complete — ${formatterState.refinedChunks.length} chunks ready. Add format criteria and run extraction.`}
+      {#if formatterState.runCompletedAt && formatterState.runStartedAt && !formatterState.currentPhase?.includes('cached')}
+        <span class="ml-2 text-xs opacity-70">({formatDuration(formatterState.runCompletedAt - formatterState.runStartedAt)})</span>
+      {/if}
     </div>
   {:else if formatterState.sourceContent.trim()}
     <div class="px-4 py-2 bg-gray-100 dark:bg-slate-800/80 text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">
