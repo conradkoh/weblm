@@ -8,8 +8,6 @@
 
 import type { FormatterState, RefinementState, ExtractionState, ExtractionResult } from './types';
 import { parseIntoChunks } from '../lib/formatter/chunker';
-import { formatChunksToMarkdown } from '../lib/formatter/markdownFormatter';
-import { analyzeAllCohesions, type CohesionAnalysis } from '../lib/formatter/cohesionAnalyzer';
 import { refineChunks, type RefinementResult } from '../lib/formatter/refiner';
 import { LocalFormatterBackend } from '../lib/formatter/localBackend';
 import { CloudFormatterBackend } from '../lib/formatter/cloudBackend';
@@ -17,6 +15,7 @@ import type { FormatterBackend } from '../lib/formatter/backend';
 import { getModelInfo } from '../config';
 import { estimateTokenCount } from '../lib/formatter/tokenizer';
 import { processChunks, type ExtractionProgress } from '../lib/formatter/extractionEngine';
+import { processPipeline, createPipelineProgressHandler } from '../lib/formatter/pipelineProcessor';
 import { logger } from '../logger';
 
 // ─── State ────────────────────────────────────────────────────
@@ -225,28 +224,21 @@ export async function runRefinement(): Promise<void> {
     
     logger.info(`Refinement: Created ${chunks.length} chunks`);
 
-    // Step 2: Format each chunk to markdown
+    // Steps 2 & 3: Format and analyze using pipeline (overlaps where possible)
+    // The pipeline handles both formatting and cohesion analysis with optimal parallelism
     setRefinementState('formatting');
-    setCurrentPhase(`Formatting ${chunks.length} chunks to markdown...`);
-    logger.info('Refinement: Starting markdown formatting');
+    const pipelineProgressHandler = createPipelineProgressHandler(setCurrentPhase, setRefinementState);
     
-    const formattedChunks = await formatChunksToMarkdown(chunks, backend, {
-      temperature: 0.3,
-      maxTokens: 2048,
-      concurrency,
-    });
+    const { formattedChunks, analyses } = await processPipeline(
+      chunks,
+      backend,
+      pipelineProgressHandler
+    );
     
-    logger.info(`Refinement: Formatted ${formattedChunks.length} chunks`);
-
-    // Step 3: Analyze cohesion between consecutive chunks
-    setRefinementState('analyzing');
-    setCurrentPhase('Analyzing chunk cohesion...');
-    logger.info('Refinement: Starting cohesion analysis');
-    
-    const analyses: CohesionAnalysis[] = await analyzeAllCohesions(formattedChunks, backend);
+    logger.info(`Refinement: Pipeline complete with ${formattedChunks.length} chunks and ${analyses.length} analyses`);
     
     const issuesFound = analyses.filter(a => a.hasIssues).length;
-    logger.info(`Refinement: Analyzed cohesion, found ${issuesFound} pairs with issues`);
+    logger.info(`Refinement: Found ${issuesFound} pairs with cohesion issues`);
 
     // Step 4: Refine chunks based on cohesion analysis
     setRefinementState('refining');
