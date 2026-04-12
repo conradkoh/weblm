@@ -2,100 +2,40 @@
   /**
    * App — root Svelte component.
    *
-   * Manages top-level app state:
-   * - Theme initialization
-   * - Service worker / offline detection
-   * - WebGPU check
-   * - Screen transitions: launcher → chat
+   * Thin orchestration layer: delegates all state to stores.
+   * onMount calls appStore.init() which handles theme, WebGPU, SW, etc.
    */
 
   import { onMount } from 'svelte';
   import StatusBar from './components/StatusBar.svelte';
   import Launcher from './components/Launcher.svelte';
   import ChatPage from './components/ChatPage.svelte';
-  import { checkWebGPUSupport, WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
-  import { loadSettings, getEffectiveTheme } from './settings';
-  import { applyThemeByName, watchSystemTheme } from './lib/themes';
-  import { registerServiceWorker, setupOfflineDetection, onOfflineStatusChange } from './sw';
-  import { logger } from './logger';
-  import { getModelInfo } from './config';
+  import { getAppState, setScreen, init as appInit } from './stores/appStore.svelte';
+  import { getEngineState } from './stores/engineStore.svelte';
+  import { WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
 
-  // ── App state ────────────────────────────────────────────────
-  type Screen = 'launcher' | 'chat';
+  const appState = getAppState();
+  const engineState = getEngineState();
 
-  let screen: Screen = $state('launcher');
-
-  // Status bar state
-  let webgpuAvailable: boolean | null = $state(null);
-  let webgpuReason: string | undefined = $state(undefined);
-  let online = $state(navigator.onLine);
-  let modelName: string | null = $state(null);
-  let modelLoading = $state(false);
-  let offlineReady = $state(false);
-
-  // Active model after loading
-  let loadedModelId: string | null = $state(null);
-
-  // ── Lifecycle ────────────────────────────────────────────────
   onMount(() => {
-    // Apply theme
-    const settings = loadSettings();
-    applyThemeByName(settings.theme);
-    if (settings.theme === 'system') {
-      watchSystemTheme(() => applyThemeByName('system'));
-    }
-
-    // Online/offline listeners
-    window.addEventListener('online', () => { online = true; });
-    window.addEventListener('offline', () => { online = false; });
-
-    // WebGPU check
-    checkWebGPUSupport().then(caps => {
-      webgpuAvailable = caps.isAvailable;
-      webgpuReason = caps.unavailableReason;
-    });
-
-    // Service worker + offline detection
-    registerServiceWorker().then(() => {
-      setupOfflineDetection();
-      onOfflineStatusChange((isOffline, isReady) => {
-        online = !isOffline;
-        if (isReady) offlineReady = true;
-      });
-    });
-
-    logger.info('App mounted');
+    appInit();
   });
 
-  // ── Handlers ─────────────────────────────────────────────────
-
   function handleModelLoaded(modelId: string): void {
-    loadedModelId = modelId;
-    const info = getModelInfo(modelId);
-    modelName = info?.displayName ?? modelId;
-    modelLoading = false;
-    screen = 'chat';
-    logger.info(`model loaded: ${modelId}`);
+    setScreen('chat');
   }
 </script>
 
 <div id="app-root">
-  <StatusBar
-    {webgpuAvailable}
-    {webgpuReason}
-    {online}
-    {modelName}
-    {modelLoading}
-    {offlineReady}
-  />
+  <StatusBar />
 
   <main class="main-content">
-    {#if webgpuAvailable === false}
+    {#if appState.webgpu.available === false}
       <!-- WebGPU not available error screen -->
       <h1 class="title">WebLM — Local AI Chat</h1>
       <div class="error-message">
         <h3>⚠️ WebGPU Not Available</h3>
-        <p>{webgpuReason ?? 'WebGPU is required for this application to run.'}</p>
+        <p>{appState.webgpu.reason ?? 'WebGPU is required for this application to run.'}</p>
         <p style="margin-top: var(--spacing-sm);">Supported browsers:</p>
         <ul style="margin-left: var(--spacing-md); margin-top: var(--spacing-sm);">
           {#each WEBGPU_BROWSER_RECOMMENDATIONS as browser (browser)}
@@ -107,11 +47,11 @@
         </p>
       </div>
 
-    {:else if screen === 'launcher'}
+    {:else if appState.screen === 'launcher'}
       <Launcher onModelLoaded={handleModelLoaded} />
 
-    {:else if screen === 'chat'}
-      <ChatPage modelId={loadedModelId ?? ''} />
+    {:else if appState.screen === 'chat'}
+      <ChatPage modelId={engineState.currentModelId ?? ''} />
     {/if}
   </main>
 </div>
@@ -161,7 +101,7 @@
     margin: var(--spacing-xs) 0;
   }
 
-/* Global CSS variables and base styles */
+  /* Global CSS variables and base styles */
   :global(*, *::before, *::after) {
     box-sizing: border-box;
     margin: 0;
