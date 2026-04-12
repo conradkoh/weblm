@@ -19,7 +19,7 @@ export class LocalFormatterBackend implements FormatterBackend {
    */
   async generate(
     messages: ChatMessage[],
-    options?: { temperature?: number; maxTokens?: number }
+    options?: { temperature?: number; maxTokens?: number; onToken?: (token: string) => void }
   ): Promise<string> {
     const engine = getEngineInstance();
 
@@ -35,6 +35,8 @@ export class LocalFormatterBackend implements FormatterBackend {
         (token) => {
           // Collect tokens for streaming (even though we don't display them)
           fullResponse += token;
+          // Call onToken callback if provided (for streaming feedback)
+          options?.onToken?.(token);
         },
         (response) => {
           logger.debug(`LocalFormatterBackend.generate: received ${response.length} chars`);

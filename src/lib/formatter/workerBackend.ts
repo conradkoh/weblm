@@ -70,16 +70,25 @@ export class WorkerPoolFormatterBackend implements FormatterBackend {
 
   /**
    * Generate text using the worker pool.
+   * 
+   * Note: Worker-based generation may not support token-level streaming
+   * due to worker message serialization. The onToken callback in options
+   * is a no-op for worker backends currently.
    */
   async generate(
     messages: ChatMessage[],
-    options?: { temperature?: number; maxTokens?: number }
+    options?: { temperature?: number; maxTokens?: number; onToken?: (token: string) => void }
   ): Promise<string> {
     await this.ensureInitialized();
 
     if (!this.pool) {
       throw new Error('WorkerPool not available after initialization');
     }
+
+    // TODO: Implement token-level streaming for worker pool if feasible
+    // Workers serialize messages, so token-level callbacks would require
+    // protocol changes. Currently onToken is not called.
+    void options?.onToken; // Acknowledge but don't use (not yet supported)
 
     return this.pool.generate(messages, options);
   }

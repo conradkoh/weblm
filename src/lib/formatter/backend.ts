@@ -14,11 +14,12 @@ export interface FormatterBackend {
    * Generate a response from messages.
    * @param messages - Array of chat messages (system, user, assistant)
    * @param options - Optional generation parameters
+   * @param options.onToken - Optional callback called with each token as it's generated (for streaming feedback)
    * @returns The generated text response
    */
   generate(
     messages: ChatMessage[],
-    options?: { temperature?: number; maxTokens?: number }
+    options?: { temperature?: number; maxTokens?: number; onToken?: (token: string) => void }
   ): Promise<string>;
 
   /**
