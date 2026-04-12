@@ -21,30 +21,27 @@
     appInit();
   });
 
-  function handleModelLoaded(_modelId: string): void {
-    // Engine store already called setScreen('chat') — nothing to do here
-  }
+  // handleModelLoaded is a no-op — engine store drives screen transition
+  function handleModelLoaded(_modelId: string): void {}
 </script>
 
-<div id="app-root">
+<div id="app-root" class="min-h-screen flex flex-col bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100">
   <StatusBar />
 
-  <main class="main-content">
+  <main class="flex-1 flex flex-col">
     {#if appState.webgpu.available === false}
       <!-- WebGPU not available error screen -->
-      <h1 class="title">WebLM — Local AI Chat</h1>
-      <div class="error-message">
-        <h3>⚠️ WebGPU Not Available</h3>
+      <h1 class="text-2xl font-semibold mb-4 p-6">WebLM — Local AI Chat</h1>
+      <div class="border border-red-500 rounded-lg p-4 mx-6 mb-6 max-w-lg bg-red-50 dark:bg-red-950">
+        <h3 class="text-red-500 font-semibold mb-2">⚠️ WebGPU Not Available</h3>
         <p>{appState.webgpu.reason ?? 'WebGPU is required for this application to run.'}</p>
-        <p style="margin-top: var(--spacing-sm);">Supported browsers:</p>
-        <ul style="margin-left: var(--spacing-md); margin-top: var(--spacing-sm);">
+        <p class="mt-2">Supported browsers:</p>
+        <ul class="ml-4 mt-2">
           {#each WEBGPU_BROWSER_RECOMMENDATIONS as browser (browser)}
-            <li>{browser}</li>
+            <li class="text-gray-500 dark:text-slate-400 my-1">{browser}</li>
           {/each}
         </ul>
-        <p style="margin-top: var(--spacing-sm);">
-          If you're using a supported browser, ensure hardware acceleration is enabled.
-        </p>
+        <p class="mt-2">If you're using a supported browser, ensure hardware acceleration is enabled.</p>
       </div>
 
     {:else if appState.screen === 'launcher'}
@@ -55,99 +52,3 @@
     {/if}
   </main>
 </div>
-
-<style>
-  #app-root {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* Error screen */
-  .title {
-    font-size: var(--font-size-xl);
-    font-weight: 600;
-    margin-bottom: var(--spacing-md);
-    padding: var(--spacing-lg);
-  }
-
-  .error-message {
-    background-color: #fef2f2;
-    border: 1px solid var(--color-error);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-md);
-    margin: 0 var(--spacing-lg) var(--spacing-lg);
-    max-width: 500px;
-  }
-
-  .error-message h3 {
-    color: var(--color-error);
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .error-message ul {
-    margin-left: var(--spacing-md);
-    margin-top: var(--spacing-sm);
-  }
-
-  .error-message li {
-    color: var(--color-text-secondary);
-    margin: var(--spacing-xs) 0;
-  }
-
-  /* Global CSS variables and base styles */
-  :global(*, *::before, *::after) {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  :global(:root) {
-    --color-primary: #4f46e5;
-    --color-background: #ffffff;
-    --color-surface: #f9fafb;
-    --color-text: #111827;
-    --color-text-secondary: #6b7280;
-    --color-border: #e5e7eb;
-    --color-error: #ef4444;
-    --color-success: #22c55e;
-
-    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    --font-size-base: 16px;
-    --font-size-sm: 14px;
-    --font-size-lg: 18px;
-    --font-size-xl: 24px;
-
-    --spacing-xs: 4px;
-    --spacing-sm: 8px;
-    --spacing-md: 16px;
-    --spacing-lg: 24px;
-    --spacing-xl: 32px;
-
-    --border-radius: 8px;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-
-  :global(body) {
-    font-family: var(--font-family);
-    font-size: var(--font-size-base);
-    line-height: 1.5;
-    color: var(--color-text);
-    background-color: var(--color-background);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  :global(#app) {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-</style>

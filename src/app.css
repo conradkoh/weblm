@@ -1,98 +1,111 @@
-/* Tailwind CSS v4 base import */
+/* Tailwind CSS v4 */
 @import "tailwindcss";
 
 /*
- * Custom theme configuration (Tailwind v4 uses CSS-based config).
- * Maps our design tokens to Tailwind custom properties.
+ * Dark mode variant — activated by `dark` class on <html>.
+ * Tailwind v4 uses @variant for custom variants.
  */
-@theme {
-  /* Primary accent — indigo */
-  --color-primary: #4f46e5;
-  --color-primary-dark: #818cf8;
+@variant dark (&:where(.dark, .dark *));
 
-  /* Surfaces */
-  --color-surface: #f9fafb;
-  --color-surface-dark: #1e293b;
+/*
+ * Base styles (applied globally).
+ */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-  /* Text */
-  --color-text-base: #111827;
-  --color-text-base-dark: #f1f5f9;
-  --color-text-muted: #6b7280;
-  --color-text-muted-dark: #94a3b8;
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-  /* Borders */
-  --color-border-base: #e5e7eb;
-  --color-border-dark: #334155;
+  body {
+    min-height: 100vh;
+  }
 
-  /* Semantic */
-  --color-error: #ef4444;
-  --color-error-dark: #f87171;
-  --color-success: #22c55e;
-  --color-success-dark: #4ade80;
+  #app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 /*
- * Preserve existing CSS variable system for backward compatibility
- * during migration. These will be removed once all components are migrated.
+ * Component utilities reused across many components.
  */
-:root {
-  --color-primary: #4f46e5;
-  --color-background: #ffffff;
-  --color-surface: #f9fafb;
-  --color-text: #111827;
-  --color-text-secondary: #6b7280;
-  --color-border: #e5e7eb;
-  --color-error: #ef4444;
-  --color-success: #22c55e;
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium font-[inherit] leading-6 text-white bg-indigo-600 border-none rounded-lg cursor-pointer transition-colors duration-150;
+  }
+  .btn:hover { @apply bg-indigo-700; }
+  .btn:active { @apply scale-[0.98]; }
+  .btn:disabled { @apply bg-gray-400 cursor-not-allowed opacity-70; }
 
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  --font-size-base: 16px;
-  --font-size-sm: 14px;
-  --font-size-lg: 18px;
-  --font-size-xl: 24px;
+  .btn-secondary {
+    @apply bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 border border-gray-200 dark:border-slate-700;
+  }
+  .btn-secondary:hover { @apply bg-gray-200 dark:bg-slate-700; }
 
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
+  .btn-danger { @apply bg-red-500; }
+  .btn-danger:hover { @apply bg-red-600; }
 
-  --border-radius: 8px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
+  /* Status dot animations */
+  .status-dot-pulse {
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
 
-/* Dark mode CSS variables — activated by adding class="dark" to <html> */
-.dark {
-  --color-primary: #818cf8;
-  --color-background: #0f172a;
-  --color-surface: #1e293b;
-  --color-text: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-border: #334155;
-  --color-error: #f87171;
-  --color-success: #4ade80;
-}
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
 
-/* Base styles */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+  /* Typing indicator */
+  .typing-dot {
+    @apply w-2 h-2 bg-gray-400 rounded-full;
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+  }
+  .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+  .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
-body {
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  line-height: 1.5;
-  color: var(--color-text);
-  background-color: var(--color-background);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  @keyframes typing-bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+  }
 
-#app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  /* Markdown/chat content prose styles (applied to assistant message content) */
+  .chat-prose p { @apply mb-2; }
+  .chat-prose h1, .chat-prose h2, .chat-prose h3 { @apply font-semibold my-2; }
+  .chat-prose ul, .chat-prose ol { @apply pl-6 mb-2; }
+  .chat-prose li { @apply my-0.5; }
+  .chat-prose blockquote { @apply border-l-4 border-indigo-500 pl-2 text-gray-500 dark:text-slate-400 my-2 italic; }
+  .chat-prose code { @apply bg-gray-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[0.9em] font-mono; }
+  .chat-prose a { @apply text-indigo-600 dark:text-indigo-400 underline; }
+  .chat-prose hr { @apply border-gray-300 dark:border-slate-600 my-3; }
+
+  /* Code block */
+  .code-block { @apply bg-[#1e1e1e] rounded-lg overflow-hidden my-2; }
+  .code-header { @apply flex justify-between items-center px-3 py-1 bg-[#2d2d2d] text-xs; }
+  .code-lang { @apply text-gray-400 font-mono; }
+  .code-block pre { @apply p-4 overflow-x-auto m-0; }
+  .code-block code { @apply text-[#d4d4d4] font-mono text-[13px] leading-relaxed; }
+
+  /* Syntax highlighting from highlight.ts */
+  .hl-keyword { color: #569cd6; font-weight: 500; }
+  .hl-string { color: #ce9178; }
+  .hl-comment { color: #6a9955; font-style: italic; }
+  .hl-number { color: #b5cea8; }
+  .hl-function { color: #dcdcaa; }
+
+  /* Code copy button */
+  .code-copy-btn {
+    @apply text-[11px] px-2 py-0.5 border border-[#555] rounded bg-transparent text-gray-400 cursor-pointer font-[inherit];
+  }
+  .code-copy-btn:hover { @apply bg-[#3d3d3d] text-white; }
 }

@@ -1,83 +1,23 @@
 /**
- * Theme types and functions for WebLM.
+ * Theme utilities for WebLM.
+ *
+ * Uses Tailwind CSS dark mode (class strategy):
+ * - Light mode: no `dark` class on `<html>`
+ * - Dark mode: `<html class="dark">`
  */
 
-/**
- * Theme colors for the application.
- */
-export interface Theme {
-  /** Primary accent color */
-  primary: string;
-  /** Background color */
-  background: string;
-  /** Surface/card background */
-  surface: string;
-  /** Text color */
-  text: string;
-  /** Secondary/muted text */
-  textSecondary: string;
-  /** Border color */
-  border: string;
-  /** Error color */
-  error: string;
-  /** Success color */
-  success: string;
-}
+export type ThemeName = 'light' | 'dark' | 'system';
 
 /**
- * Default light theme.
+ * Apply theme by toggling the `dark` class on `<html>`.
  */
-const lightTheme: Theme = {
-  primary: '#4f46e5',
-  background: '#ffffff',
-  surface: '#f9fafb',
-  text: '#111827',
-  textSecondary: '#6b7280',
-  border: '#e5e7eb',
-  error: '#ef4444',
-  success: '#22c55e',
-};
-
-/**
- * Default dark theme.
- */
-const darkTheme: Theme = {
-  primary: '#818cf8',
-  background: '#0f172a',
-  surface: '#1e293b',
-  text: '#f1f5f9',
-  textSecondary: '#94a3b8',
-  border: '#334155',
-  error: '#f87171',
-  success: '#4ade80',
-};
-
-/**
- * Apply theme to document root.
- */
-export function applyTheme(theme: Theme): void {
-  const root = document.documentElement;
-  root.style.setProperty('--color-primary', theme.primary);
-  root.style.setProperty('--color-background', theme.background);
-  root.style.setProperty('--color-surface', theme.surface);
-  root.style.setProperty('--color-text', theme.text);
-  root.style.setProperty('--color-text-secondary', theme.textSecondary);
-  root.style.setProperty('--color-border', theme.border);
-  root.style.setProperty('--color-error', theme.error);
-  root.style.setProperty('--color-success', theme.success);
-}
-
-/**
- * Apply theme by name (resolving 'system' preference).
- */
-export function applyThemeByName(themeName: 'light' | 'dark' | 'system'): void {
+export function applyThemeByName(themeName: ThemeName): void {
+  const html = document.documentElement;
   if (themeName === 'system') {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    applyTheme(prefersDark ? darkTheme : lightTheme);
-  } else if (themeName === 'dark') {
-    applyTheme(darkTheme);
+    html.classList.toggle('dark', prefersDark);
   } else {
-    applyTheme(lightTheme);
+    html.classList.toggle('dark', themeName === 'dark');
   }
 }
 
@@ -87,15 +27,7 @@ export function applyThemeByName(themeName: 'light' | 'dark' | 'system'): void {
  */
 export function watchSystemTheme(callback: () => void): () => void {
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-  const handler = () => {
-    callback();
-  };
-
+  const handler = () => callback();
   mediaQuery.addEventListener('change', handler);
-
-  return () => {
-    mediaQuery.removeEventListener('change', handler);
-  };
+  return () => mediaQuery.removeEventListener('change', handler);
 }
-
