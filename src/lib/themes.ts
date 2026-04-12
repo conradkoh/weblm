@@ -27,7 +27,7 @@ export interface Theme {
 /**
  * Default light theme.
  */
-export const lightTheme: Theme = {
+const lightTheme: Theme = {
   primary: '#4f46e5',
   background: '#ffffff',
   surface: '#f9fafb',
@@ -41,7 +41,7 @@ export const lightTheme: Theme = {
 /**
  * Default dark theme.
  */
-export const darkTheme: Theme = {
+const darkTheme: Theme = {
   primary: '#818cf8',
   background: '#0f172a',
   surface: '#1e293b',
@@ -99,11 +99,3 @@ export function watchSystemTheme(callback: () => void): () => void {
   };
 }
 
-/**
- * Generate a style string for inline application.
- */
-export function createStyles(styles: Record<string, string>): string {
-  return Object.entries(styles)
-    .map(([key, value]) => `${key}: ${value}`)
-    .join('; ');
-}
