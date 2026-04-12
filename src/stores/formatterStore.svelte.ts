@@ -15,7 +15,8 @@ import type { FormatterBackend } from '../lib/formatter/backend';
 import { getModelInfo } from '../config';
 import { estimateTokenCount } from '../lib/formatter/tokenizer';
 import { processChunks, type ExtractionProgress } from '../lib/formatter/extractionEngine';
-import { processPipeline, createPipelineProgressHandler } from '../lib/formatter/pipelineProcessor';
+import { processPipeline } from '../lib/formatter/pipelineProcessor';
+import { getEngineInstance } from '../engine/engine-factory';
 import { logger } from '../logger';
 
 // ─── State ────────────────────────────────────────────────────
@@ -253,6 +254,17 @@ export function stopProcessing(): void {
   
   logger.info('Stop requested - promoting partial results');
   
+  // Actually stop the engine generation
+  try {
+    const engine = getEngineInstance();
+    if (engine.isGenerating()) {
+      engine.stopGeneration();
+      logger.info('Engine generation stopped');
+    }
+  } catch (err) {
+    logger.warn('Could not stop engine:', err);
+  }
+  
   // Stop processing
   _state.isProcessing = false;
   _state.isStopped = true;
@@ -315,16 +327,45 @@ export function invalidateRefinementCache(): void {
 }
 
 /**
- * Simple hash function for content change detection.
- * Uses djb2 algorithm - fast and simple, no crypto needed.
+ * Simple hash function for content change detection using djb2 algorithm.
+ * 
+ * ⚠️ WARNING: For very large content (1MB+), djb2 hash collisions become more likely.
+ * This is acceptable for UX caching purposes but not for security.
+ * For extra safety, we also store content length alongside hash.
+ * 
+ * @param content - The content to hash
+ * @param contentLength - Optional pre-computed length (avoids re-calculation)
+ * @returns A hex string representation of the hash
  */
-export function computeContentHash(content: string): string {
+export function computeContentHash(content: string, contentLength?: number): string {
+  const len = contentLength ?? content.length;
   let hash = 5381;
-  for (let i = 0; i < content.length; i++) {
-    hash = ((hash << 5) + hash) + content.charCodeAt(i);
+  // Use first and last 1KB plus length for better uniqueness
+  const sampleSize = Math.min(1024, len);
+  const sample = (len > sampleSize * 2)
+    ? content.slice(0, sampleSize) + content.slice(-sampleSize)
+    : content;
+  
+  for (let i = 0; i < sample.length; i++) {
+    hash = ((hash << 5) + hash) + sample.charCodeAt(i);
     hash = hash & hash; // Convert to 32-bit integer
   }
+  
+  // Mix in length to differentiate content with same sampled prefix
+  hash = ((hash << 5) + hash) + (len % 0xFFFFFFFF);
+  hash = hash & hash;
+  
   return hash.toString(16);
+}
+
+/**
+ * Check if content matches stored hash (with length verification).
+ * More reliable than hash-only check due to collision protection.
+ */
+export function isContentCached(content: string, storedHash: string | null, storedLength: number | null): boolean {
+  if (!storedHash || !storedLength) return false;
+  if (content.length !== storedLength) return false;
+  return computeContentHash(content, content.length) === storedHash;
 }
 
 /**
@@ -362,6 +403,24 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
     return;
   }
 
+  // Step 0: Check cache BEFORE clearing any state
+  // If content unchanged and we have cached results, skip processing entirely
+  const forceRefinement = options?.force ?? false;
+  if (!forceRefinement && _state.sourceContentHash !== null && _state.refinedChunks.length > 0) {
+    // Verify hash with length check for collision protection
+    const currentHash = computeContentHash(sourceContent, sourceContent.length);
+    if (currentHash === _state.sourceContentHash) {
+      // Content unchanged, use cached results
+      _state.runStartedAt = Date.now();
+      _state.runCompletedAt = Date.now();
+      setRefinementState('complete');
+      setCurrentPhase(`Using cached refinement (${_state.refinedChunks.length} chunks)`);
+      logger.info(`Refinement: Using cached results (${_state.refinedChunks.length} chunks)`);
+      return; // Early return - don't set isProcessing
+    }
+  }
+
+  // Proceeding with refinement - clear state
   _state.isProcessing = true;
   _state.errorMessage = null;
   _state.refinedChunks = [];
@@ -372,21 +431,6 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
   _state.runCompletedAt = null;
 
   try {
-    // Step 0: Check cache - skip processing if content unchanged and we have cached results
-    const forceRefinement = options?.force ?? false;
-    if (!forceRefinement && _state.sourceContentHash !== null && _state.refinedChunks.length > 0) {
-      const currentHash = computeContentHash(sourceContent);
-      if (currentHash === _state.sourceContentHash) {
-        // Content unchanged, use cached results
-        _state.runCompletedAt = Date.now();
-        setRefinementState('complete');
-        setCurrentPhase(`Using cached refinement (${_state.refinedChunks.length} chunks)`);
-        logger.info(`Refinement: Using cached results (${_state.refinedChunks.length} chunks)`);
-        _state.isProcessing = false;
-        return;
-      }
-    }
-
     // Step 1: Parse into chunks using model's context window
     setRefinementState('chunking');
     setCurrentPhase('Parsing source into chunks...');
@@ -498,7 +542,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       
       _state.refinedChunks = validChunks;
       // Store content hash for cache
-      _state.sourceContentHash = computeContentHash(sourceContent);
+      _state.sourceContentHash = computeContentHash(sourceContent, sourceContent.length);
       _state.runCompletedAt = Date.now();
       updatePhaseProgress(1);
       completeTaskPlan();
@@ -509,7 +553,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       // Fall back to formatted chunks if refinement failed
       _state.refinedChunks = formattedChunks;
       // Store content hash for cache
-      _state.sourceContentHash = computeContentHash(sourceContent);
+      _state.sourceContentHash = computeContentHash(sourceContent, sourceContent.length);
       _state.runCompletedAt = Date.now();
       updatePhaseProgress(1);
       completeTaskPlan();

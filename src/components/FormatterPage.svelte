@@ -616,7 +616,7 @@
                 </span>
                 {#if currentChunk}
                   <span class="text-xs text-gray-500 dark:text-slate-400">
-                    (~{Math.ceil(currentChunk.length / 4)} chars)
+                    ({currentChunk.length} chars)
                   </span>
                 {/if}
               </div>
