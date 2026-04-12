@@ -5,6 +5,7 @@
    */
 
   import type { UploadedFile } from '../stores/types';
+  import { Button } from '$ui/button';
 
   const SUPPORTED_TYPES = ['.txt', '.md', '.csv', '.json'];
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -100,16 +101,17 @@
 </script>
 
 <!-- Upload button -->
-<button
-  class="flex items-center justify-center w-9 h-9 p-0 text-lg bg-transparent border-none rounded-lg cursor-pointer transition-colors duration-150 flex-shrink-0 hover:bg-gray-200 dark:hover:bg-slate-700"
+<Button
+  variant="ghost"
+  size="icon"
   title="Upload file"
   aria-label="Upload file"
   onclick={() => fileInputEl?.click()}
 >
   📎
-</button>
+</Button>
 
-<!-- Hidden file input -->
+<!-- Hidden file input (native — no shadcn equivalent) -->
 <input
   type="file"
   accept={SUPPORTED_TYPES.join(',')}
@@ -131,11 +133,13 @@
         <span class="font-semibold text-gray-900 dark:text-slate-100 text-sm">{uploadedFile.name}</span>
         <span class="text-gray-500 dark:text-slate-400 text-[12px]">{formatSize(uploadedFile.size)}</span>
       </div>
-      <button
-        class="flex items-center justify-center w-6 h-6 p-0 bg-transparent border-none rounded text-gray-500 dark:text-slate-400 text-base cursor-pointer transition-colors duration-150 hover:bg-red-500 hover:text-white"
+      <Button
+        variant="ghost"
+        size="sm"
+        class="w-6 h-6 p-0 hover:bg-red-500 hover:text-white"
         aria-label="Remove file"
         onclick={onFileClear}
-      >✕</button>
+      >✕</Button>
     </div>
   </div>
 {/if}
@@ -148,7 +152,7 @@
   >{errorMessage}</div>
 {/if}
 
-<!-- Drag-and-drop overlay -->
+<!-- Drag-and-drop overlay (custom — no shadcn equivalent) -->
 {#if isDragging}
   <div
     class="fixed inset-0 bg-indigo-600/10 flex items-center justify-center z-[1000]"

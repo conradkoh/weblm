@@ -5,6 +5,7 @@
    */
 
   import type { GenerationMetrics } from '../stores/types';
+  import { Badge } from '$ui/badge';
 
   export type { GenerationMetrics };
 
@@ -34,14 +35,14 @@
 
 {#if metrics}
   <div class="flex gap-2 mt-1 flex-wrap">
-    <span class="text-[11px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-2 py-0.5" title="Time to first token">
+    <Badge variant="outline" class="text-[11px] rounded-full" title="Time to first token">
       TTFT: {formatTTFT(metrics.ttft)}
-    </span>
-    <span class="text-[11px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-2 py-0.5" title="Tokens per second">
+    </Badge>
+    <Badge variant="outline" class="text-[11px] rounded-full" title="Tokens per second">
       {formatTPS(metrics.tokensPerSecond)}
-    </span>
-    <span class="text-[11px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-2 py-0.5" title="Total generation time">
+    </Badge>
+    <Badge variant="outline" class="text-[11px] rounded-full" title="Total generation time">
       {formatTime(metrics.totalTime)}
-    </span>
+    </Badge>
   </div>
 {/if}
