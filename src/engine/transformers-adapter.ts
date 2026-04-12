@@ -19,6 +19,7 @@ import {
 import type { LLMEngine } from './llm-engine';
 import type { ChatMessage } from '../types';
 import type { ModelProgress, ProgressCallback } from './types';
+import { ProgressAggregator } from './progress-aggregator';
 import { getTransformersModelRecord } from './transformers-models';
 import { logger } from '../logger';
 
@@ -152,6 +153,7 @@ export class TransformersJsAdapter implements LLMEngine {
   /**
    * Load a text-generation model via the pipeline API.
    * Used for models like Qwen2.5.
+   * Single sequential download — no aggregation needed.
    */
   private async initializePipeline(
     modelId: string,
@@ -170,6 +172,8 @@ export class TransformersJsAdapter implements LLMEngine {
   /**
    * Load a conditional-generation model via AutoProcessor + model class.
    * Used for multimodal models like Gemma 4 in text-only mode.
+   * Both AutoProcessor and ModelClass download files in parallel,
+   * so ProgressAggregator is used to prevent UI flicker.
    */
   private async initializeConditionalGeneration(
     modelId: string,
@@ -179,8 +183,15 @@ export class TransformersJsAdapter implements LLMEngine {
     const { AutoProcessor, Gemma4ForCausalLM: ModelClass } =
       await import('@huggingface/transformers');
 
+    // Aggregate concurrent progress events from AutoProcessor and ModelClass
+    const aggregator = new ProgressAggregator();
+    aggregator.reset();
+
     const progressCallback = (info: ProgressInfo) => {
-      this.handleProgress(info, onProgress);
+      const aggregated = aggregator.process(info);
+      if (aggregated && onProgress) {
+        onProgress(aggregated);
+      }
     };
 
     const [processor, model] = await Promise.all([
@@ -296,40 +307,35 @@ export class TransformersJsAdapter implements LLMEngine {
   // ─── Progress helper ────────────────────────────────────────
 
   /**
-   * Convert @huggingface/transformers progress info to our ModelProgress type.
+   * Simple passthrough progress handler for pipeline mode (single sequential download).
+   * Conditional-generation mode uses ProgressAggregator instead.
    */
   private handleProgress(info: ProgressInfo, onProgress?: ProgressCallback): void {
     if (!onProgress) return;
 
-    let progress: ModelProgress;
+    // Guard access to `file` — only exists on some ProgressInfo variants
+    const hasFile = 'file' in info && info.file !== undefined;
 
-    if (info.status === 'progress') {
-      progress = {
+    if (info.status === 'progress' && hasFile) {
+      onProgress({
         phase: 'downloading',
         progress: Math.round(info.progress ?? 0),
-        message: `Downloading ${info.file ?? ''}… (${Math.round(info.progress ?? 0)}%)`,
-      };
+        message: `Downloading ${info.file}… (${Math.round(info.progress ?? 0)}%)`,
+      });
     } else if (info.status === 'progress_total') {
-      progress = {
+      onProgress({
         phase: 'loading',
         progress: Math.round(info.progress ?? 0),
         message: `Loading model… (${Math.round(info.progress ?? 0)}%)`,
-      };
+      });
     } else if (info.status === 'ready') {
-      progress = {
-        phase: 'ready',
-        progress: 100,
-        message: 'Model ready.',
-      };
+      onProgress({ phase: 'ready', progress: 100, message: 'Model ready.' });
     } else {
-      // 'initiate' | 'download' | 'done'
-      progress = {
+      onProgress({
         phase: 'loading',
         progress: 0,
-        message: `Loading${info.file ? ` ${info.file}` : ''}…`,
-      };
+        message: hasFile ? `Loading ${info.file}…` : 'Loading…',
+      });
     }
-
-    onProgress(progress);
   }
 }
