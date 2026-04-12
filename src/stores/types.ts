@@ -145,4 +145,7 @@ export interface FormatterState {
   partialExtractionResults: ExtractionResult[];  // completed extraction results
   // Stop flag for cancellation
   isStopped: boolean;
+  // Markdown preview mode
+  previewMode: 'raw' | 'preview' | 'chunks';  // current view mode
+  currentChunkIndex: number;                    // selected chunk index for preview
 }

@@ -59,6 +59,9 @@ const _state = $state<FormatterState>({
   partialExtractionResults: [],
   // Stop flag for cancellation
   isStopped: false,
+  // Markdown preview mode
+  previewMode: 'raw',
+  currentChunkIndex: 0,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -281,6 +284,29 @@ export function stopProcessing(): void {
   
   // Clear streaming
   clearStreamingText();
+}
+
+// Preview mode mutations for markdown preview
+export function setPreviewMode(mode: 'raw' | 'preview' | 'chunks'): void {
+  _state.previewMode = mode;
+}
+
+export function setCurrentChunkIndex(index: number): void {
+  if (index >= 0 && index < _state.refinedChunks.length) {
+    _state.currentChunkIndex = index;
+  }
+}
+
+export function nextChunk(): void {
+  if (_state.currentChunkIndex < _state.refinedChunks.length - 1) {
+    _state.currentChunkIndex++;
+  }
+}
+
+export function prevChunk(): void {
+  if (_state.currentChunkIndex > 0) {
+    _state.currentChunkIndex--;
+  }
 }
 
 // Cache functions for refinement results
@@ -520,6 +546,8 @@ export function resetRefinement(): void {
   _state.runStartedAt = null;
   _state.runCompletedAt = null;
   _state.isStopped = false;
+  _state.previewMode = 'raw';
+  _state.currentChunkIndex = 0;
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();
@@ -744,6 +772,8 @@ export function resetFormatterState(): void {
   _state.partialRefinedChunks = [];
   _state.partialExtractionResults = [];
   _state.isStopped = false;
+  _state.previewMode = 'raw';
+  _state.currentChunkIndex = 0;
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();

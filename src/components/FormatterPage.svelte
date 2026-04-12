@@ -29,8 +29,12 @@
     setWorkerPoolSize,
     setWorkerModelId,
     stopProcessing,
+    setPreviewMode,
+    nextChunk,
+    prevChunk,
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
+  import { renderMarkdown } from '../lib/markdown';
   import type { ExtractionResult } from '../stores/types';
 
   const formatterState = getFormatterState();
@@ -525,9 +529,34 @@
     <!-- Output Column -->
     <div class="flex flex-col gap-2 min-h-0">
       <div class="flex items-center justify-between">
-        <label for="output-display" class="font-semibold text-sm text-gray-700 dark:text-slate-300">
-          Output
-        </label>
+        <div class="flex items-center gap-2">
+          <label for="output-display" class="font-semibold text-sm text-gray-700 dark:text-slate-300">
+            Output
+          </label>
+          {#if formatterState.refinedChunks.length > 0 || formatterState.extractionResults.length > 0}
+            <!-- Preview mode tabs -->
+            <div class="flex items-center gap-1 ml-4">
+              <button
+                class="text-xs px-2 py-1 rounded {formatterState.previewMode === 'raw' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'}"
+                onclick={() => setPreviewMode('raw')}
+              >
+                Raw
+              </button>
+              <button
+                class="text-xs px-2 py-1 rounded {formatterState.previewMode === 'preview' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'}"
+                onclick={() => setPreviewMode('preview')}
+              >
+                Preview
+              </button>
+              <button
+                class="text-xs px-2 py-1 rounded {formatterState.previewMode === 'chunks' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'}"
+                onclick={() => setPreviewMode('chunks')}
+              >
+                Chunks
+              </button>
+            </div>
+          {/if}
+        </div>
         <div class="flex items-center gap-1">
           {#if formatterState.extractionResults.length > 0}
             <Button
@@ -565,8 +594,62 @@
           {/if}
         </div>
       </div>
+      
+      <!-- Output content based on preview mode -->
       <div id="output-display" class="flex-1 min-h-[200px] max-h-[300px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 overflow-y-auto">
-        {#if formatterState.refinementState === 'error'}
+        
+        {#if formatterState.previewMode === 'preview' && formatterState.refinedChunks.length > 0}
+          <!-- Preview mode: rendered markdown of all chunks -->
+          <div class="p-3 prose prose-sm dark:prose-invert max-w-none">
+            {@html renderMarkdown(formatterState.refinedChunks.join('\n\n---\n\n'))}
+          </div>
+        
+        {:else if formatterState.previewMode === 'chunks' && formatterState.refinedChunks.length > 0}
+          <!-- Chunks mode: individual chunk navigation -->
+          {@const currentChunk = formatterState.refinedChunks[formatterState.currentChunkIndex]}
+          <div class="p-3">
+            <!-- Chunk navigation header -->
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-slate-700">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-700 dark:text-slate-300">
+                  Chunk {formatterState.currentChunkIndex + 1} of {formatterState.refinedChunks.length}
+                </span>
+                {#if currentChunk}
+                  <span class="text-xs text-gray-500 dark:text-slate-400">
+                    (~{Math.ceil(currentChunk.length / 4)} chars)
+                  </span>
+                {/if}
+              </div>
+              <div class="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={formatterState.currentChunkIndex === 0}
+                  onclick={prevChunk}
+                >
+                  ◀ Prev
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={formatterState.currentChunkIndex >= formatterState.refinedChunks.length - 1}
+                  onclick={nextChunk}
+                >
+                  Next ▶
+                </Button>
+              </div>
+            </div>
+            <!-- Rendered chunk content -->
+            <div class="prose prose-sm dark:prose-invert max-w-none">
+              {#if currentChunk}
+                {@html renderMarkdown(currentChunk)}
+              {:else}
+                <p class="text-gray-400 dark:text-slate-500">No chunk selected</p>
+              {/if}
+            </div>
+          </div>
+        
+        {:else if formatterState.refinementState === 'error'}
           <div class="flex items-center justify-center h-full text-red-500 dark:text-red-400 text-sm p-4">
             Error: {formatterState.errorMessage ?? 'Unknown error'}
           </div>
@@ -580,8 +663,9 @@
               1. Add source content<br/>2. Click "Refine Source"<br/>3. Add format criteria<br/>4. Click "Run Extraction"
             </div>
           {:else}
-            <div class="flex items-center justify-center h-full text-gray-400 dark:text-slate-500 text-sm p-4">
-              Refined chunks ready. Add format criteria and click "Run Extraction".
+            <!-- Raw mode: show chunks as plain text -->
+            <div class="p-3 font-mono text-xs whitespace-pre-wrap text-gray-700 dark:text-slate-300">
+              {formatterState.refinedChunks.join('\n\n---\n\n')}
             </div>
           {/if}
         {:else}
