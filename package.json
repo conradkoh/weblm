@@ -11,8 +11,10 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@types/bun": "latest",
     "esbuild": "^0.28.0",
+    "svelte": "^5.55.3",
     "vite": "^8.0.8",
     "vite-plugin-singlefile": "^2.3.2"
   },

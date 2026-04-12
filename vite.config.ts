@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
   root: '.',
@@ -9,7 +10,7 @@ export default defineConfig({
     target: 'esnext',
     minify: 'esbuild',
   },
-  plugins: [viteSingleFile()],
+  plugins: [svelte(), viteSingleFile()],
   server: {
     headers: {
       // Required for SharedArrayBuffer (WASM high-performance memory)
