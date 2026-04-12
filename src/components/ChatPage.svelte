@@ -57,16 +57,20 @@
   }
 </script>
 
-<div class="chat-page">
+<div class="flex-1 flex flex-col w-full max-w-[800px] mx-auto h-full overflow-hidden">
   <!-- Header -->
-  <div class="chat-header">
-    <span class="chat-header-title">{modelDisplayName}</span>
-    <div class="chat-header-actions">
-      <button class="new-chat-btn" title="Start a new conversation" onclick={handleNewChat}>
+  <div class="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 flex-shrink-0">
+    <span class="font-semibold text-gray-900 dark:text-slate-100 text-sm">{modelDisplayName}</span>
+    <div class="flex items-center gap-2">
+      <button
+        class="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium font-[inherit] text-gray-900 dark:text-slate-100 bg-transparent border border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-slate-800 hover:border-indigo-600 dark:hover:border-indigo-400"
+        title="Start a new conversation"
+        onclick={handleNewChat}
+      >
         + New Chat
       </button>
       <button
-        class="settings-button"
+        class="flex items-center justify-center w-8 h-8 p-0 text-lg bg-transparent border-none rounded-lg cursor-pointer transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-slate-700"
         title="Settings"
         aria-label="Open settings"
         onclick={() => { showSettings = true; }}
@@ -75,25 +79,25 @@
   </div>
 
   <!-- Messages -->
-  <div class="chat-messages-wrapper">
+  <div class="flex-1 flex flex-col overflow-hidden">
     <ChatMessages messages={chatState.messages} />
   </div>
 
   <!-- Metrics -->
   {#if chatState.lastMetrics}
-    <div class="metrics-wrapper">
+    <div class="px-4 pb-1 flex-shrink-0">
       <Metrics metrics={chatState.lastMetrics} />
     </div>
   {/if}
 
   <!-- Input area -->
-  <div class="input-area">
+  <div class="flex items-end gap-1 px-2 bg-gray-50 dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 flex-shrink-0">
     <Upload
       uploadedFile={chatState.uploadedFile}
       onFileLoaded={(f) => setUploadedFile(f)}
       onFileClear={() => clearUploadedFile()}
     />
-    <div class="input-flex">
+    <div class="flex-1 min-w-0">
       <MessageInput
         isGenerating={chatState.isGenerating}
         onSend={handleSendMessage}
@@ -110,111 +114,3 @@
   messages={chatState.messages}
   onClose={() => { showSettings = false; }}
 />
-
-<style>
-  .chat-page {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-width: 800px;
-    margin: 0 auto;
-    height: 100%;
-    overflow: hidden;
-  }
-
-  .chat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-bottom: 1px solid var(--color-border);
-    background-color: var(--color-surface);
-    flex-shrink: 0;
-  }
-
-  .chat-header-title {
-    font-weight: 600;
-    color: var(--color-text);
-    font-size: var(--font-size-sm);
-  }
-
-  .chat-header-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-  }
-
-  .new-chat-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: var(--font-size-sm);
-    font-family: inherit;
-    font-weight: 500;
-    color: var(--color-text);
-    background-color: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-  }
-
-  .new-chat-btn:hover {
-    background-color: var(--color-surface);
-    border-color: var(--color-primary);
-  }
-
-  .settings-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    font-size: 18px;
-    background-color: transparent;
-    border: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-  }
-
-  .settings-button:hover {
-    background-color: var(--color-border);
-  }
-
-  .chat-messages-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .metrics-wrapper {
-    padding: 0 var(--spacing-md) var(--spacing-xs);
-    flex-shrink: 0;
-  }
-
-  .input-area {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--spacing-xs);
-    padding: 0 var(--spacing-sm);
-    background-color: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-    flex-shrink: 0;
-  }
-
-  .input-flex {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /* Suppress internal border from MessageInput since we have outer one */
-  .input-flex :global(.input-container) {
-    border-top: none;
-    padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) 0;
-  }
-</style>

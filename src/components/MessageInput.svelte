@@ -52,9 +52,9 @@
   }
 </script>
 
-<div class="input-container" role="form" aria-label="Message input form">
+<div class="flex gap-2 p-3" role="form" aria-label="Message input form">
   <textarea
-    class="input-textarea"
+    class="flex-1 px-3 py-2 text-base font-[inherit] leading-6 text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg resize-none outline-none transition-[border-color] duration-150 focus:border-indigo-600 dark:focus:border-indigo-400 disabled:bg-gray-50 dark:disabled:bg-slate-800 disabled:text-gray-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed placeholder:text-gray-500 dark:placeholder:text-slate-400"
     placeholder="Type a message..."
     rows={1}
     aria-label="Message input"
@@ -65,10 +65,10 @@
     onkeydown={handleKeydown}
   ></textarea>
 
-  <div class="input-buttons">
+  <div class="flex gap-2 items-end">
     {#if isGenerating}
       <button
-        class="button button-danger"
+        class="btn btn-danger"
         aria-label="Stop generation"
         onclick={onStop}
       >
@@ -76,7 +76,7 @@
       </button>
     {:else}
       <button
-        class="button"
+        class="btn"
         aria-label="Send message"
         disabled={!canSend}
         onclick={handleSend}
@@ -86,77 +86,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  .input-container {
-    display: flex;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md);
-    background-color: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .input-textarea {
-    flex: 1;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-base);
-    font-family: inherit;
-    line-height: 1.5;
-    color: var(--color-text);
-    background-color: var(--color-background);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    resize: none;
-    outline: none;
-    transition: border-color 0.15s ease;
-  }
-
-  .input-textarea:focus {
-    border-color: var(--color-primary);
-  }
-
-  .input-textarea:disabled {
-    background-color: var(--color-surface);
-    color: var(--color-text-secondary);
-    cursor: not-allowed;
-  }
-
-  .input-textarea::placeholder {
-    color: var(--color-text-secondary);
-  }
-
-  .input-buttons {
-    display: flex;
-    gap: var(--spacing-sm);
-    align-items: flex-end;
-  }
-
-  /* Button styles needed locally */
-  :global(.button) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-base);
-    font-weight: 500;
-    font-family: inherit;
-    line-height: 1.5;
-    color: white;
-    background-color: var(--color-primary);
-    border: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background-color 0.15s ease, transform 0.1s ease;
-  }
-
-  :global(.button:hover) { background-color: #4338ca; }
-  :global(.button:active) { transform: scale(0.98); }
-  :global(.button:disabled) {
-    background-color: var(--color-text-secondary);
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
-  :global(.button-danger) { background-color: var(--color-error); }
-  :global(.button-danger:hover) { background-color: #dc2626; }
-</style>

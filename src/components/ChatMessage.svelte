@@ -68,24 +68,29 @@
 </script>
 
 <div
-  class="chat-message chat-message-{message.role}"
+  class="flex max-w-[80%] {message.role === 'user' ? 'ml-auto' : 'mr-auto'}"
   id="message-{message.id}"
   data-timestamp={message.timestamp}
   role="article"
   aria-label="{message.role === 'user' ? 'You' : 'Assistant'} message"
 >
-  <div class="chat-bubble">
-    <div class="chat-content" id="content-{message.id}">
+  <div
+    class="px-3 py-2 rounded-lg max-w-full break-words
+      {message.role === 'user'
+        ? 'bg-indigo-600 text-white rounded-br-[4px] whitespace-pre-wrap'
+        : 'bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 border border-gray-200 dark:border-slate-700 rounded-bl-[4px]'}"
+  >
+    <div class="leading-6" id="content-{message.id}">
       {#if message.streaming}
         <!-- Typing indicator -->
-        <div class="typing-indicator" aria-label="Assistant is typing">
-          <span></span>
-          <span></span>
-          <span></span>
+        <div class="flex gap-1 py-1" aria-label="Assistant is typing">
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
         </div>
       {:else if message.role === 'assistant'}
         <!-- Markdown-rendered HTML -->
-        {@html renderedHtml()}
+        <div class="chat-prose">{@html renderedHtml()}</div>
       {:else}
         <!-- Plain text for user / system -->
         {message.content}
@@ -94,10 +99,15 @@
 
     <!-- Footer: timestamp + copy -->
     {#if !message.streaming}
-      <div class="chat-message-footer">
-        <div class="chat-timestamp">{formatTimestamp(message.timestamp)}</div>
+      <div class="flex items-center justify-between gap-2 mt-1">
+        <div class="text-[11px] opacity-70 {message.role === 'user' ? 'text-white/80' : 'text-gray-500 dark:text-slate-400'}">
+          {formatTimestamp(message.timestamp)}
+        </div>
         <button
-          class="copy-btn {messageCopied ? 'copied' : ''}"
+          class="text-[11px] px-2 py-0.5 border rounded font-[inherit] cursor-pointer transition-all duration-150
+            {messageCopied
+              ? 'bg-green-500 border-green-500 text-white'
+              : 'border-gray-200 dark:border-slate-700 bg-transparent text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:border-indigo-600 dark:hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'}"
           aria-label="Copy message"
           title="Copy message"
           onclick={copyMessage}
@@ -108,204 +118,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  .chat-message {
-    display: flex;
-    max-width: 80%;
-  }
-
-  .chat-message-user {
-    margin-left: auto;
-  }
-
-  .chat-message-assistant {
-    margin-right: auto;
-  }
-
-  .chat-bubble {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--border-radius);
-    max-width: 100%;
-    word-wrap: break-word;
-  }
-
-  .chat-message-user .chat-bubble {
-    background-color: var(--color-primary);
-    color: white;
-    border-bottom-right-radius: 4px;
-    white-space: pre-wrap;
-  }
-
-  .chat-message-assistant .chat-bubble {
-    background-color: var(--color-surface);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-    border-bottom-left-radius: 4px;
-  }
-
-  .chat-content {
-    line-height: 1.5;
-  }
-
-  /* Markdown styles inside assistant bubbles */
-  .chat-message-assistant .chat-content :global(p) {
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .chat-message-assistant .chat-content :global(h1),
-  .chat-message-assistant .chat-content :global(h2),
-  .chat-message-assistant .chat-content :global(h3) {
-    margin: var(--spacing-sm) 0;
-    font-weight: 600;
-  }
-
-  .chat-message-assistant .chat-content :global(ul),
-  .chat-message-assistant .chat-content :global(ol) {
-    padding-left: var(--spacing-lg);
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .chat-message-assistant .chat-content :global(li) {
-    margin: 2px 0;
-  }
-
-  .chat-message-assistant .chat-content :global(blockquote) {
-    border-left: 3px solid var(--color-primary);
-    padding-left: var(--spacing-sm);
-    color: var(--color-text-secondary);
-    margin: var(--spacing-sm) 0;
-  }
-
-  .chat-message-assistant .chat-content :global(code.inline-code) {
-    background-color: var(--color-border);
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-family: monospace;
-    font-size: 0.9em;
-  }
-
-  .chat-message-assistant .chat-content :global(.code-block) {
-    background-color: #1e1e1e;
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    margin: var(--spacing-sm) 0;
-  }
-
-  .chat-message-assistant .chat-content :global(.code-header) {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    background-color: #2d2d2d;
-    font-size: 12px;
-  }
-
-  .chat-message-assistant .chat-content :global(.code-lang) {
-    color: #9ca3af;
-    font-family: monospace;
-  }
-
-  .chat-message-assistant .chat-content :global(.code-block pre) {
-    padding: var(--spacing-sm) var(--spacing-md);
-    overflow-x: auto;
-    margin: 0;
-  }
-
-  .chat-message-assistant .chat-content :global(.code-block code) {
-    color: #d4d4d4;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    line-height: 1.6;
-  }
-
-  /* Syntax highlight classes */
-  .chat-message-assistant .chat-content :global(.hl-keyword) { color: #569cd6; font-weight: 500; }
-  .chat-message-assistant .chat-content :global(.hl-string) { color: #ce9178; }
-  .chat-message-assistant .chat-content :global(.hl-comment) { color: #6a9955; font-style: italic; }
-  .chat-message-assistant .chat-content :global(.hl-number) { color: #b5cea8; }
-  .chat-message-assistant .chat-content :global(.hl-function) { color: #dcdcaa; }
-
-  /* Typing indicator */
-  .typing-indicator {
-    display: flex;
-    gap: 4px;
-    padding: 4px 0;
-  }
-
-  .typing-indicator span {
-    width: 8px;
-    height: 8px;
-    background-color: var(--color-text-secondary);
-    border-radius: 50%;
-    animation: typing-bounce 1.4s infinite ease-in-out both;
-  }
-
-  .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-  .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-
-  @keyframes typing-bounce {
-    0%, 80%, 100% { transform: scale(0); }
-    40% { transform: scale(1); }
-  }
-
-  /* Footer */
-  .chat-message-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-xs);
-  }
-
-  .chat-timestamp {
-    font-size: 11px;
-    color: var(--color-text-secondary);
-    opacity: 0.7;
-  }
-
-  .chat-message-user .chat-timestamp {
-    color: rgba(255, 255, 255, 0.8);
-  }
-
-  .copy-btn {
-    font-size: 11px;
-    padding: 2px 8px;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    background-color: transparent;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: inherit;
-  }
-
-  .copy-btn:hover {
-    background-color: var(--color-surface);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-  }
-
-  .copy-btn.copied {
-    background-color: var(--color-success);
-    border-color: var(--color-success);
-    color: white;
-  }
-
-  /* Code block copy button from markdown renderer */
-  .chat-message-assistant .chat-content :global(.copy-btn) {
-    font-size: 11px;
-    padding: 2px 8px;
-    border: 1px solid #555;
-    border-radius: 4px;
-    background-color: transparent;
-    color: #9ca3af;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  .chat-message-assistant .chat-content :global(.copy-btn:hover) {
-    background-color: #3d3d3d;
-    color: white;
-  }
-</style>

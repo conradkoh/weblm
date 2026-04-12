@@ -43,7 +43,7 @@
 </script>
 
 <div
-  class="chat-messages"
+  class="flex-1 overflow-y-auto p-4 flex flex-col gap-4"
   id="chat-messages"
   role="log"
   aria-live="polite"
@@ -54,14 +54,3 @@
     <ChatMessageItem {message} />
   {/each}
 </div>
-
-<style>
-  .chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--spacing-md);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-  }
-</style>
