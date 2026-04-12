@@ -1,7 +1,7 @@
 /**
  * Pipeline processor — overlaps formatting and cohesion analysis for optimal throughput.
  * 
- * For concurrent backends (cloud/worker): format all chunks in parallel batches, then analyze in parallel batches.
+ * For concurrent backends (worker pool): format all chunks in parallel batches, then analyze in parallel batches.
  * For sequential backends (local): interleave format and analyze to minimize idle time.
  */
 
@@ -27,11 +27,11 @@ export interface PipelineResult {
 /**
  * Process chunks through a pipeline where formatting and cohesion analysis may overlap.
  * 
- * - Concurrent backends (cloud/worker): Format all chunks in parallel, then analyze in parallel
+ * - Concurrent backends (worker pool): Format all chunks in parallel, then analyze in parallel
  * - Sequential backends (local): Interleave format and analyze
  * 
  * @param chunks - Raw text chunks to process
- * @param backend - Formatter backend (local, cloud, or worker pool)
+ * @param backend - Formatter backend (local or worker pool)
  * @param onProgress - Optional callback for progress updates
  * @returns Promise resolving to formatted chunks and cohesion analyses
  */

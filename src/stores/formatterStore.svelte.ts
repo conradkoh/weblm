@@ -10,7 +10,6 @@ import type { FormatterState, RefinementState, ExtractionState, ExtractionResult
 import { parseIntoChunks } from '../lib/formatter/chunker';
 import { refineChunks, type RefinementResult } from '../lib/formatter/refiner';
 import { LocalFormatterBackend } from '../lib/formatter/localBackend';
-import { CloudFormatterBackend } from '../lib/formatter/cloudBackend';
 import type { FormatterBackend } from '../lib/formatter/backend';
 import { getModelInfo } from '../config';
 import { estimateTokenCount } from '../lib/formatter/tokenizer';
@@ -33,11 +32,6 @@ const _state = $state<FormatterState>({
   extractionState: 'idle',
   extractionResults: [],
   showAllResults: false,
-  // Cloud API configuration (Note: API key stored in localStorage - not production-secure)
-  cloudApiUrl: '',
-  cloudApiKey: '',
-  cloudApiModel: 'gpt-4o-mini',
-  useCloudApi: false,
   // Worker Pool configuration (Experimental)
   useWorkerPool: false,
   workerPoolSize: 2,  // 1-4, default 2
@@ -113,38 +107,9 @@ export function setShowAllResults(show: boolean): void {
   _state.showAllResults = show;
 }
 
-// Cloud API configuration setters (Note: API key stored in localStorage - not production-secure)
-export function setCloudApiUrl(url: string): void {
-  _state.cloudApiUrl = url;
-  saveToLocalStorage();
-}
-
-export function setCloudApiKey(key: string): void {
-  _state.cloudApiKey = key;
-  saveToLocalStorage();
-}
-
-export function setCloudApiModel(model: string): void {
-  _state.cloudApiModel = model;
-  saveToLocalStorage();
-}
-
-export function setUseCloudApi(use: boolean): void {
-  _state.useCloudApi = use;
-  // When cloud API is enabled, disable worker pool
-  if (use) {
-    _state.useWorkerPool = false;
-  }
-  saveToLocalStorage();
-}
-
 // Worker Pool configuration setters (Experimental)
 export function setUseWorkerPool(use: boolean): void {
   _state.useWorkerPool = use;
-  // When worker pool is enabled, disable cloud API
-  if (use) {
-    _state.useCloudApi = false;
-  }
   saveToLocalStorage();
 }
 
@@ -161,27 +126,17 @@ export function setWorkerModelId(modelId: string): void {
 
 /**
  * Get the appropriate formatter backend based on current settings.
- * Priority: Cloud API > Worker Pool > Local
+ * Priority: Worker Pool > Local
  */
 export function getFormatterBackend(): FormatterBackend {
-  // Priority 1: Cloud API
-  if (_state.useCloudApi && _state.cloudApiKey && _state.cloudApiUrl) {
-    logger.info(`Using CloudFormatterBackend (concurrency: 5)`);
-    return new CloudFormatterBackend({
-      apiUrl: _state.cloudApiUrl,
-      apiKey: _state.cloudApiKey,
-      model: _state.cloudApiModel,
-    });
-  }
-  
-  // Priority 2: Worker Pool (lazy import to avoid bundling issues)
+  // Priority 1: Worker Pool (lazy import to avoid bundling issues)
   if (_state.useWorkerPool && _state.workerModelId) {
     logger.info(`Using WorkerPoolFormatterBackend (${_state.workerPoolSize} workers)`);
     const { WorkerPoolFormatterBackend } = require('./workerBackend');
     return new WorkerPoolFormatterBackend(_state.workerModelId, _state.workerPoolSize);
   }
   
-  // Priority 3: Local
+  // Priority 2: Local
   return new LocalFormatterBackend();
 }
 
@@ -379,11 +334,6 @@ interface StoredData {
   sourceContent: string;
   desiredFormat: string;
   selectedModelId: string | null;
-  // Cloud API configuration (Note: API key stored in localStorage - not production-secure)
-  cloudApiUrl: string;
-  cloudApiKey: string;
-  cloudApiModel: string;
-  useCloudApi: boolean;
   // Worker Pool configuration (Experimental)
   useWorkerPool: boolean;
   workerPoolSize: number;
@@ -396,10 +346,6 @@ function saveToLocalStorage(): void {
       sourceContent: _state.sourceContent,
       desiredFormat: _state.desiredFormat,
       selectedModelId: _state.selectedModelId,
-      cloudApiUrl: _state.cloudApiUrl,
-      cloudApiKey: _state.cloudApiKey,
-      cloudApiModel: _state.cloudApiModel,
-      useCloudApi: _state.useCloudApi,
       useWorkerPool: _state.useWorkerPool,
       workerPoolSize: _state.workerPoolSize,
       workerModelId: _state.workerModelId,
@@ -418,10 +364,6 @@ export function loadFromLocalStorage(): void {
       _state.sourceContent = data.sourceContent ?? '';
       _state.desiredFormat = data.desiredFormat ?? '';
       _state.selectedModelId = data.selectedModelId ?? null;
-      _state.cloudApiUrl = data.cloudApiUrl ?? '';
-      _state.cloudApiKey = data.cloudApiKey ?? '';
-      _state.cloudApiModel = data.cloudApiModel ?? 'gpt-4o-mini';
-      _state.useCloudApi = data.useCloudApi ?? false;
       _state.useWorkerPool = data.useWorkerPool ?? false;
       _state.workerPoolSize = data.workerPoolSize ?? 2;
       _state.workerModelId = data.workerModelId ?? '';
@@ -453,11 +395,6 @@ export function resetFormatterState(): void {
   _state.extractionState = 'idle';
   _state.extractionResults = [];
   _state.showAllResults = false;
-  // Reset cloud API settings but keep the values
-  _state.cloudApiUrl = '';
-  _state.cloudApiKey = '';
-  _state.cloudApiModel = 'gpt-4o-mini';
-  _state.useCloudApi = false;
   // Reset worker pool settings but keep the values
   _state.useWorkerPool = false;
   _state.workerPoolSize = 2;

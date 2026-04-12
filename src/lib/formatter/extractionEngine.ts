@@ -26,7 +26,7 @@ export interface ExtractionProgress {
 }
 
 export interface ExtractionEngineOptions {
-  /** Backend for LLM calls (local or cloud). Defaults to LocalFormatterBackend */
+  /** Backend for LLM calls. Defaults to LocalFormatterBackend */
   backend?: FormatterBackend;
   /** Concurrency limit for parallel LLM calls */
   concurrency?: number;

@@ -9,7 +9,7 @@ import { generateId } from '../../types';
 
 /**
  * Format a raw text chunk into well-structured markdown.
- * Uses the provided backend (local engine or cloud API) to perform the formatting.
+ * Uses the provided backend (local engine or worker pool) to perform the formatting.
  */
 export async function formatChunkToMarkdown(
   chunk: string,

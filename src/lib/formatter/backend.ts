@@ -1,13 +1,13 @@
 /**
  * Formatter backend abstraction layer.
- * Allows formatter to use either local engine or cloud API.
+ * Allows formatter to use either local engine or worker pool.
  */
 
 import type { ChatMessage } from '../../types';
 
 /**
  * Backend for formatter LLM operations.
- * Abstracts away whether we're using local engine or cloud API.
+ * Abstracts away whether we're using local engine or worker pool.
  */
 export interface FormatterBackend {
   /**
@@ -23,45 +23,20 @@ export interface FormatterBackend {
 
   /**
    * Whether this backend supports concurrent requests.
-   * Local engines typically don't; cloud APIs usually do.
+   * Local engines typically don't; worker pools usually do.
    */
   supportsConcurrency(): boolean;
 
   /**
    * Recommended concurrency level for this backend.
-   * Returns 1 for local (sequential), higher for cloud APIs.
+   * Returns 1 for local (sequential), higher for concurrent backends.
    */
   recommendedConcurrency(): number;
 
   /**
    * Backend type identifier.
    * 'local' = uses WebLLM/transformers.js engine
-   * 'cloud' = uses OpenAI-compatible REST API
    * 'worker' = uses Web Worker pool with Transformers.js in WASM mode
    */
-  type(): 'local' | 'cloud' | 'worker';
-}
-
-/**
- * Configuration for cloud API backend.
- */
-export interface CloudApiConfig {
-  /** Base URL for the API (e.g., "https://api.openai.com/v1") */
-  apiUrl: string;
-  /** API key for authentication */
-  apiKey: string;
-  /** Model identifier (e.g., "gpt-4o-mini") */
-  model: string;
-}
-
-/**
- * Create a backend based on type.
- */
-export function createBackend(type: 'local' | 'cloud', config?: CloudApiConfig): FormatterBackend {
-  if (type === 'cloud' && config) {
-    const { CloudFormatterBackend } = require('./cloudBackend');
-    return new CloudFormatterBackend(config);
-  }
-  const { LocalFormatterBackend } = require('./localBackend');
-  return new LocalFormatterBackend();
+  type(): 'local' | 'worker';
 }
