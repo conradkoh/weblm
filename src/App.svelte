@@ -12,6 +12,7 @@
   import { onMount } from 'svelte';
   import StatusBar from './components/StatusBar.svelte';
   import Launcher from './components/Launcher.svelte';
+  import ChatPage from './components/ChatPage.svelte';
   import { checkWebGPUSupport, WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
   import { loadSettings, getEffectiveTheme } from './settings';
   import { applyThemeByName, watchSystemTheme } from './ui/styles/themes';
@@ -110,13 +111,7 @@
       <Launcher onModelLoaded={handleModelLoaded} />
 
     {:else if screen === 'chat'}
-      <!-- Chat screen placeholder — will be replaced in Phase 3 -->
-      <div class="chat-placeholder">
-        <p>✅ Model loaded: <strong>{modelName}</strong></p>
-        <p style="color: var(--color-text-secondary); margin-top: var(--spacing-sm);">
-          Chat UI coming in Phase 3.
-        </p>
-      </div>
+      <ChatPage modelId={loadedModelId ?? ''} />
     {/if}
   </main>
 </div>
@@ -166,18 +161,7 @@
     margin: var(--spacing-xs) 0;
   }
 
-  /* Chat placeholder */
-  .chat-placeholder {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-xl);
-    text-align: center;
-  }
-
-  /* Global CSS variables and base styles */
+/* Global CSS variables and base styles */
   :global(*, *::before, *::after) {
     box-sizing: border-box;
     margin: 0;
