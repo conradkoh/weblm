@@ -4,8 +4,8 @@
    * Renders a single chat message bubble with markdown, copy button, and timestamp.
    */
 
-  import { renderMarkdown } from '../ui/markdown';
-  import { highlightCode } from '../ui/highlight';
+  import { renderMarkdown } from '../lib/markdown';
+  import { highlightCode } from '../lib/highlight';
   import type { ChatMessage } from '../types';
 
   interface Props {

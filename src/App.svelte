@@ -15,7 +15,7 @@
   import ChatPage from './components/ChatPage.svelte';
   import { checkWebGPUSupport, WEBGPU_BROWSER_RECOMMENDATIONS } from './engine/webgpu-check';
   import { loadSettings, getEffectiveTheme } from './settings';
-  import { applyThemeByName, watchSystemTheme } from './ui/styles/themes';
+  import { applyThemeByName, watchSystemTheme } from './lib/themes';
   import { registerServiceWorker, setupOfflineDetection, onOfflineStatusChange } from './sw';
   import { logger } from './logger';
   import { getModelInfo } from './config';

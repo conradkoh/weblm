@@ -14,7 +14,6 @@
   import { initializeEngine } from '../engine/index';
   import { loadChatMessages, saveChatMessages, clearChatMessages } from '../storage/idb';
   import { getTemperature, getMaxTokens, getTopP, getSystemPrompt, getShowMetrics } from '../settings';
-  import { loadMetricsPreference } from '../ui/metrics';
   import { getModelInfo, DEFAULT_MODEL_ID } from '../config';
   import { logger } from '../logger';
   import type { ChatMessage } from '../types';
@@ -40,7 +39,6 @@
 
   // Load chat history on mount
   $effect(() => {
-    loadMetricsPreference();
     loadHistory();
   });
 

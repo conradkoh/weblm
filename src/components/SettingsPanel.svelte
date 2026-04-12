@@ -15,7 +15,7 @@
     getShowMetrics, setShowMetrics,
     type Theme,
   } from '../settings';
-  import { applyThemeByName } from '../ui/styles/themes';
+  import { applyThemeByName } from '../lib/themes';
   import { exportChatAsText, exportChatAsMarkdown } from '../app/export';
   import type { ChatMessage } from '../types';
 
