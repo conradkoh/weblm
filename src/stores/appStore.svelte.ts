@@ -15,7 +15,7 @@ import { logger } from '../logger';
 // ─── State ────────────────────────────────────────────────────
 
 const _state = $state<AppState>({
-  screen: 'launcher',
+  screen: 'launcher-home',
   online: navigator.onLine,
   offlineReady: false,
   webgpu: { available: null },

@@ -8,6 +8,7 @@
 
   import { onMount } from 'svelte';
   import StatusBar from './components/StatusBar.svelte';
+  import AppLauncher from './components/AppLauncher.svelte';
   import Launcher from './components/Launcher.svelte';
   import ChatPage from './components/ChatPage.svelte';
   import { getAppState, init as appInit } from './stores/appStore.svelte';
@@ -43,6 +44,9 @@
         </ul>
         <p class="mt-2">If you're using a supported browser, ensure hardware acceleration is enabled.</p>
       </div>
+
+    {:else if appState.screen === 'launcher-home'}
+      <AppLauncher />
 
     {:else if appState.screen === 'launcher'}
       <Launcher onModelLoaded={handleModelLoaded} />

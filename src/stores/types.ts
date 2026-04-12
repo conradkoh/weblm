@@ -13,7 +13,7 @@ export type { ChatMessage, ModelProgress, Theme };
 
 // ─── App ──────────────────────────────────────────────────────
 
-export type Screen = 'launcher' | 'chat';
+export type Screen = 'launcher-home' | 'launcher' | 'chat';
 
 export interface WebGPUState {
   available: boolean | null;
