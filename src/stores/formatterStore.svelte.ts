@@ -266,8 +266,18 @@ export async function runRefinement(): Promise<void> {
     let hasAdvancedToAnalyzing = false;
     let hasAdvancedToRefining = false;
     
+    // Clear and set up streaming for refinement pipeline
+    clearStreamingText();
+    const streamingCallback = (token: string) => {
+      appendStreamingToken(token);
+    };
+    
     // Enhanced progress handler that updates chunk progress and task plan
     const pipelineProgressHandler = async (progress: { phase: string; formatted: number; analyzed: number; total: number; message: string }) => {
+      // Clear streaming at start of analyzing phase
+      if (progress.phase === 'analyzing' && progress.analyzed === 1) {
+        clearStreamingText();
+      }
       setCurrentPhase(progress.message);
       setCompletedChunks(progress.formatted);
       if (progress.phase === 'formatting') {
@@ -298,7 +308,8 @@ export async function runRefinement(): Promise<void> {
     const { formattedChunks, analyses } = await processPipeline(
       chunks,
       backend,
-      pipelineProgressHandler
+      pipelineProgressHandler,
+      streamingCallback
     );
     
     logger.info(`Refinement: Pipeline complete with ${formattedChunks.length} chunks and ${analyses.length} analyses`);
@@ -309,9 +320,10 @@ export async function runRefinement(): Promise<void> {
     // Step 4: Refine chunks based on cohesion analysis
     setRefinementState('refining');
     setCurrentPhase('Refining chunks based on analysis...');
+    clearStreamingText();
     logger.info('Refinement: Starting chunk refinement');
     
-    const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses, backend);
+    const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses, backend, { onToken: streamingCallback });
     
     if (refinementResult.success) {
       // Validate chunk sizes (800 tokens max, ~3200 chars)

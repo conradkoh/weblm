@@ -27,7 +27,8 @@ export interface CohesionAnalysis {
 export async function analyzeCohesion(
   chunk1: string,
   chunk2: string,
-  backend: FormatterBackend
+  backend: FormatterBackend,
+  options?: { onToken?: (token: string) => void }
 ): Promise<CohesionAnalysis> {
   const systemPrompt = `You are a content analysis assistant. Analyze two text chunks for cohesion issues.
 For each pair, identify:
@@ -78,6 +79,7 @@ Output only JSON, no other text:`;
   const response = await backend.generate(messages, {
     temperature: 0.3,
     maxTokens: 1024,
+    onToken: options?.onToken,
   });
 
   try {
@@ -109,7 +111,8 @@ Output only JSON, no other text:`;
  */
 export async function analyzeAllCohesions(
   chunks: string[],
-  backend: FormatterBackend
+  backend: FormatterBackend,
+  options?: { onToken?: (token: string) => void }
 ): Promise<CohesionAnalysis[]> {
   if (chunks.length < 2) {
     return [];
@@ -127,7 +130,7 @@ export async function analyzeAllCohesions(
       const chunk2 = chunks[idx + 1]!;
       
       batch.push(
-        analyzeCohesion(chunk1, chunk2, backend).catch(err => {
+        analyzeCohesion(chunk1, chunk2, backend, options).catch(err => {
           logger.error(`Error analyzing cohesion between chunks ${idx} and ${idx + 1}:`, err);
           return {
             hasIssues: false,

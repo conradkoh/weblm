@@ -7,6 +7,12 @@ import type { FormatterBackend } from './backend';
 import { logger } from '../../logger';
 import { generateId } from '../../types';
 
+export interface FormatOptions {
+  temperature?: number;
+  maxTokens?: number;
+  onToken?: (token: string) => void;
+}
+
 /**
  * Format a raw text chunk into well-structured markdown.
  * Uses the provided backend (local engine or worker pool) to perform the formatting.
@@ -14,7 +20,7 @@ import { generateId } from '../../types';
 export async function formatChunkToMarkdown(
   chunk: string,
   backend: FormatterBackend,
-  options?: { temperature?: number; maxTokens?: number }
+  options?: FormatOptions
 ): Promise<string> {
   const systemPrompt = `You are a text formatting assistant. Your task is to convert raw text into well-structured markdown.
 Follow these rules:
@@ -47,6 +53,7 @@ Follow these rules:
   const response = await backend.generate(messages, {
     temperature: options?.temperature ?? 0.3,
     maxTokens: options?.maxTokens ?? 4096,
+    onToken: options?.onToken,
   });
 
   return response.trim();
@@ -58,7 +65,7 @@ Follow these rules:
 export async function formatChunksToMarkdown(
   chunks: string[],
   backend: FormatterBackend,
-  options?: { temperature?: number; maxTokens?: number; concurrency?: number }
+  options?: { temperature?: number; maxTokens?: number; concurrency?: number; onToken?: (token: string) => void }
 ): Promise<string[]> {
   const concurrency = options?.concurrency ?? backend.recommendedConcurrency();
   const results: string[] = new Array(chunks.length);
@@ -86,14 +93,11 @@ export async function formatChunksToMarkdown(
   return results;
 }
 
-/**
- * Format a chunk to markdown with timeout.
- */
 export async function formatChunkWithTimeout(
   chunk: string,
   backend: FormatterBackend,
   timeoutMs: number = 30000,
-  options?: { temperature?: number; maxTokens?: number }
+  options?: FormatOptions
 ): Promise<string> {
   return Promise.race([
     formatChunkToMarkdown(chunk, backend, options),

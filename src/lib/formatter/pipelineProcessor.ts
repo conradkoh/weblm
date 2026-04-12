@@ -33,12 +33,14 @@ export interface PipelineResult {
  * @param chunks - Raw text chunks to process
  * @param backend - Formatter backend (local or worker pool)
  * @param onProgress - Optional callback for progress updates
+ * @param onToken - Optional callback for streaming token feedback
  * @returns Promise resolving to formatted chunks and cohesion analyses
  */
 export async function processPipeline(
   chunks: string[],
   backend: FormatterBackend,
-  onProgress?: (progress: PipelineProgress) => void | Promise<void>
+  onProgress?: (progress: PipelineProgress) => void | Promise<void>,
+  onToken?: (token: string) => void
 ): Promise<PipelineResult> {
   if (chunks.length === 0) {
     return { formattedChunks: [], analyses: [] };
@@ -65,7 +67,7 @@ export async function processPipeline(
       
       const batchResults = await Promise.all(
         batch.map(async (chunk, batchIdx) => {
-          const formatted = await formatChunkToMarkdown(chunk, backend);
+          const formatted = await formatChunkToMarkdown(chunk, backend, { onToken });
           return { index: i + batchIdx, formatted };
         })
       );
@@ -99,7 +101,7 @@ export async function processPipeline(
           const chunk2 = formattedChunks[j + 1];
           if (chunk1 !== undefined && chunk2 !== undefined) {
             batchPromises.push(
-              analyzeCohesion(chunk1, chunk2, backend).then(analysis => ({ index: j, analysis }))
+              analyzeCohesion(chunk1, chunk2, backend, { onToken }).then(analysis => ({ index: j, analysis }))
             );
           }
         }
@@ -139,7 +141,7 @@ export async function processPipeline(
     logger.info('Pipeline: Using sequential mode (interleaved)');
     
     // Format the first chunk
-    formattedChunks[0] = await formatChunkToMarkdown(chunks[0]!, backend);
+    formattedChunks[0] = await formatChunkToMarkdown(chunks[0]!, backend, { onToken });
     formattedCount = 1;
     
     await onProgress?.({
@@ -153,7 +155,7 @@ export async function processPipeline(
     // For each subsequent chunk: format it, then immediately analyze the pair
     for (let i = 1; i < chunks.length; i++) {
       // Format chunk[i]
-      formattedChunks[i] = await formatChunkToMarkdown(chunks[i]!, backend);
+      formattedChunks[i] = await formatChunkToMarkdown(chunks[i]!, backend, { onToken });
       formattedCount++;
       
       await onProgress?.({
@@ -169,7 +171,7 @@ export async function processPipeline(
       const currChunk = formattedChunks[i];
       
       if (prevChunk !== undefined && currChunk !== undefined) {
-        const analysis = await analyzeCohesion(prevChunk, currChunk, backend);
+        const analysis = await analyzeCohesion(prevChunk, currChunk, backend, { onToken });
         analyses.push(analysis);
         analyzedCount++;
         

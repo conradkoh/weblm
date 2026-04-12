@@ -22,7 +22,8 @@ export interface RefinementResult {
 export async function refineChunks(
   chunks: string[],
   analyses: CohesionAnalysis[],
-  backend: FormatterBackend
+  backend: FormatterBackend,
+  options?: { onToken?: (token: string) => void }
 ): Promise<RefinementResult> {
   // Check if any refinement is needed
   const needsRefinement = analyses.some(a => a.hasIssues && a.issues.length > 0);
@@ -80,6 +81,7 @@ Output the refined chunks separated by "---CHUNK_SEPARATOR---" (no other text):`
   const response = await backend.generate(messages, {
     temperature: 0.5,
     maxTokens: 4096,
+    onToken: options?.onToken,
   });
 
   try {
