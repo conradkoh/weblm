@@ -5,6 +5,7 @@
    */
 
   import type { ModelProgress } from '../engine/types';
+  import { Button } from '$ui/button';
 
   interface Props {
     progress: ModelProgress | null;
@@ -62,9 +63,9 @@
     <div class="mt-4 p-4 bg-red-50 dark:bg-red-950 border border-red-500 rounded-lg" role="alert">
       <p class="text-red-500 text-sm m-0 mb-2">{error}</p>
       {#if onRetry}
-        <button class="btn text-sm px-4 py-1" aria-label="Retry loading model" onclick={onRetry}>
+        <Button size="sm" aria-label="Retry loading model" onclick={onRetry}>
           Try Again
-        </button>
+        </Button>
       {/if}
     </div>
   {/if}

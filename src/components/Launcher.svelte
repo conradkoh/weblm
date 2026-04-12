@@ -15,6 +15,8 @@
     getStorageInfo,
   } from '../stores/engineStore.svelte';
   import { DEFAULT_MODEL_ID } from '../config';
+  import { Button } from '$ui/button';
+  import * as Card from '$ui/card';
 
   interface Props {
     onModelLoaded: (modelId: string) => void;
@@ -72,57 +74,61 @@
 </script>
 
 <div class="flex items-center justify-center min-h-full px-6 py-8">
-  <div class="w-full max-w-[480px] flex flex-col gap-6">
-    <!-- Hero -->
-    <div class="text-center pb-2">
-      <div class="text-5xl leading-none mb-2">🧠</div>
-      <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100 m-0 mb-1">WebLM</h1>
-      <p class="text-base text-gray-500 dark:text-slate-400 m-0">Local AI Chat — Private &amp; Fast</p>
-    </div>
+  <div class="w-full max-w-[480px]">
+    <Card.Root class="flex flex-col gap-6 p-6">
+      <Card.Content class="p-0 flex flex-col gap-6">
+        <!-- Hero -->
+        <div class="text-center pb-2">
+          <div class="text-5xl leading-none mb-2">🧠</div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100 m-0 mb-1">WebLM</h1>
+          <p class="text-base text-gray-500 dark:text-slate-400 m-0">Local AI Chat — Private &amp; Fast</p>
+        </div>
 
-    <!-- Storage status -->
-    {#if storageStatus}
-      <p class="text-center text-sm text-gray-500 dark:text-slate-400 opacity-80 -mt-4">{storageStatus}</p>
-    {/if}
+        <!-- Storage status -->
+        {#if storageStatus}
+          <p class="text-center text-sm text-gray-500 dark:text-slate-400 opacity-80 -mt-4">{storageStatus}</p>
+        {/if}
 
-    <!-- Model selector -->
-    <ModelSelector
-      {cachedModelIds}
-      bind:selectedModelId
-      onModelSelect={(id) => { selectedModelId = id; }}
-    />
+        <!-- Model selector -->
+        <ModelSelector
+          {cachedModelIds}
+          bind:selectedModelId
+          onModelSelect={(id) => { selectedModelId = id; }}
+        />
 
-    <!-- Progress bar (shown while loading or on error) -->
-    {#if isLoading || loadError}
-      <ProgressBar
-        progress={engineState.progress}
-        error={loadError}
-        onRetry={loadError ? handleRetry : undefined}
-      />
-    {/if}
+        <!-- Progress bar (shown while loading or on error) -->
+        {#if isLoading || loadError}
+          <ProgressBar
+            progress={engineState.progress}
+            error={loadError}
+            onRetry={loadError ? handleRetry : undefined}
+          />
+        {/if}
 
-    <!-- Action buttons -->
-    <div class="flex flex-col gap-2">
-      <button
-        class="btn w-full py-3 px-6 text-base font-semibold"
-        id="load-button"
-        disabled={isLoading}
-        aria-label="Load selected model"
-        onclick={handleLoad}
-      >
-        {loadButtonText}
-      </button>
+        <!-- Action buttons -->
+        <div class="flex flex-col gap-2">
+          <Button
+            class="w-full py-3 px-6 text-base font-semibold h-auto"
+            id="load-button"
+            disabled={isLoading}
+            aria-label="Load selected model"
+            onclick={handleLoad}
+          >
+            {loadButtonText}
+          </Button>
 
-      {#if cachedModelIds.has(selectedModelId) && !isLoading}
-        <button
-          class="btn btn-secondary"
-          id="clear-button"
-          aria-label="Clear cached model"
-          onclick={handleClearCache}
-        >
-          Clear Cache
-        </button>
-      {/if}
-    </div>
+          {#if cachedModelIds.has(selectedModelId) && !isLoading}
+            <Button
+              variant="outline"
+              id="clear-button"
+              aria-label="Clear cached model"
+              onclick={handleClearCache}
+            >
+              Clear Cache
+            </Button>
+          {/if}
+        </div>
+      </Card.Content>
+    </Card.Root>
   </div>
 </div>
