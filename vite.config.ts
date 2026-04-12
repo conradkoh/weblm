@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   root: '.',
@@ -10,7 +11,7 @@ export default defineConfig({
     target: 'esnext',
     minify: 'esbuild',
   },
-  plugins: [svelte(), viteSingleFile()],
+  plugins: [tailwindcss(), svelte(), viteSingleFile()],
   server: {
     headers: {
       // Required for SharedArrayBuffer (WASM high-performance memory)

@@ -1,0 +1,98 @@
+/* Tailwind CSS v4 base import */
+@import "tailwindcss";
+
+/*
+ * Custom theme configuration (Tailwind v4 uses CSS-based config).
+ * Maps our design tokens to Tailwind custom properties.
+ */
+@theme {
+  /* Primary accent — indigo */
+  --color-primary: #4f46e5;
+  --color-primary-dark: #818cf8;
+
+  /* Surfaces */
+  --color-surface: #f9fafb;
+  --color-surface-dark: #1e293b;
+
+  /* Text */
+  --color-text-base: #111827;
+  --color-text-base-dark: #f1f5f9;
+  --color-text-muted: #6b7280;
+  --color-text-muted-dark: #94a3b8;
+
+  /* Borders */
+  --color-border-base: #e5e7eb;
+  --color-border-dark: #334155;
+
+  /* Semantic */
+  --color-error: #ef4444;
+  --color-error-dark: #f87171;
+  --color-success: #22c55e;
+  --color-success-dark: #4ade80;
+}
+
+/*
+ * Preserve existing CSS variable system for backward compatibility
+ * during migration. These will be removed once all components are migrated.
+ */
+:root {
+  --color-primary: #4f46e5;
+  --color-background: #ffffff;
+  --color-surface: #f9fafb;
+  --color-text: #111827;
+  --color-text-secondary: #6b7280;
+  --color-border: #e5e7eb;
+  --color-error: #ef4444;
+  --color-success: #22c55e;
+
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-size-base: 16px;
+  --font-size-sm: 14px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  --border-radius: 8px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode CSS variables — activated by adding class="dark" to <html> */
+.dark {
+  --color-primary: #818cf8;
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-border: #334155;
+  --color-error: #f87171;
+  --color-success: #4ade80;
+}
+
+/* Base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

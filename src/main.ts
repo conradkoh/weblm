@@ -4,6 +4,7 @@
  * Entry point. Mounts the Svelte application.
  */
 
+import './app.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
 
