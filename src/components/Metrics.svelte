@@ -33,27 +33,15 @@
 </script>
 
 {#if metrics}
-  <div class="message-metrics">
-    <span class="metric" title="Time to first token">TTFT: {formatTTFT(metrics.ttft)}</span>
-    <span class="metric" title="Tokens per second">{formatTPS(metrics.tokensPerSecond)}</span>
-    <span class="metric" title="Total generation time">{formatTime(metrics.totalTime)}</span>
+  <div class="flex gap-2 mt-1 flex-wrap">
+    <span class="text-[11px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-2 py-0.5" title="Time to first token">
+      TTFT: {formatTTFT(metrics.ttft)}
+    </span>
+    <span class="text-[11px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-2 py-0.5" title="Tokens per second">
+      {formatTPS(metrics.tokensPerSecond)}
+    </span>
+    <span class="text-[11px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-2 py-0.5" title="Total generation time">
+      {formatTime(metrics.totalTime)}
+    </span>
   </div>
 {/if}
-
-<style>
-  .message-metrics {
-    display: flex;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-xs);
-    flex-wrap: wrap;
-  }
-
-  .metric {
-    font-size: 11px;
-    color: var(--color-text-secondary);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 99px;
-    padding: 1px 8px;
-  }
-</style>
