@@ -93,13 +93,13 @@
     }
   }
 
-  async function handleRefineSource(): Promise<void> {
+  async function handleRefineSource(force: boolean = false): Promise<void> {
     if (!formatterState.selectedModelId || engineState.currentModelId !== formatterState.selectedModelId) {
       alert('Please load a model first by clicking the ▶ Load button.');
       return;
     }
     
-    await runRefinement();
+    await runRefinement({ force });
   }
 
   async function handleRunExtraction(): Promise<void> {
@@ -415,14 +415,26 @@
             </span>
           {/if}
         </div>
-        <Button
-          variant="default"
-          size="sm"
-          disabled={!formatterState.sourceContent.trim() || isRefining || isExtracting}
-          onclick={handleRefineSource}
-        >
-          {isRefining ? 'Refining...' : 'Refine Source'}
-        </Button>
+        <div class="flex items-center gap-2">
+          {#if formatterState.refinedChunks.length > 0 && formatterState.refinementState === 'complete'}
+            <Button
+              variant="outline"
+              size="sm"
+              title="Re-process source with current content"
+              onclick={() => handleRefineSource(true)}
+            >
+              🔄 Re-process
+            </Button>
+          {/if}
+          <Button
+            variant="default"
+            size="sm"
+            disabled={!formatterState.sourceContent.trim() || isRefining || isExtracting}
+            onclick={() => handleRefineSource(false)}
+          >
+            {isRefining ? 'Refining...' : 'Refine Source'}
+          </Button>
+        </div>
       </div>
       <Textarea
         id="source-input"
@@ -647,7 +659,7 @@
     </div>
   {:else if formatterState.refinementState === 'complete' && formatterState.refinedChunks.length > 0}
     <div class="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-400 flex-shrink-0">
-      ✓ Refinement complete — {formatterState.refinedChunks.length} chunks ready. Add format criteria and run extraction.
+      ✓ {formatterState.currentPhase?.includes('cached') ? formatterState.currentPhase : `Refinement complete — ${formatterState.refinedChunks.length} chunks ready. Add format criteria and run extraction.`}
     </div>
   {:else if formatterState.sourceContent.trim()}
     <div class="px-4 py-2 bg-gray-100 dark:bg-slate-800/80 text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">

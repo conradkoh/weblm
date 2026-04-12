@@ -131,4 +131,6 @@ export interface FormatterState {
   taskPlan: TaskPlan;
   // Streaming text for live token feedback
   streamingText: string;
+  // Cache: hash of source content to detect unchanged content
+  sourceContentHash: string | null;
 }

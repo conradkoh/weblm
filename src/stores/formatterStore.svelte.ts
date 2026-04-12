@@ -49,6 +49,8 @@ const _state = $state<FormatterState>({
   },
   // Streaming text for live token feedback
   streamingText: '',
+  // Cache: hash of source content to detect unchanged content
+  sourceContentHash: null,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -189,6 +191,24 @@ export function clearStreamingText(): void {
   _state.streamingText = '';
 }
 
+// Cache functions for refinement results
+export function invalidateRefinementCache(): void {
+  _state.sourceContentHash = null;
+}
+
+/**
+ * Simple hash function for content change detection.
+ * Uses djb2 algorithm - fast and simple, no crypto needed.
+ */
+export function computeContentHash(content: string): string {
+  let hash = 5381;
+  for (let i = 0; i < content.length; i++) {
+    hash = ((hash << 5) + hash) + content.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString(16);
+}
+
 /**
  * Get the appropriate formatter backend based on current settings.
  * Priority: Worker Pool > Local
@@ -210,8 +230,9 @@ export function getFormatterBackend(): FormatterBackend {
 /**
  * Run the complete refinement pipeline on the source content.
  * Phase 1: Source Refinement
+ * @param options.force - If true, bypass cache check and re-process
  */
-export async function runRefinement(): Promise<void> {
+export async function runRefinement(options?: { force?: boolean }): Promise<void> {
   const { sourceContent } = _state;
   // Get backend based on settings (cloud or local)
   const backend = getFormatterBackend();
@@ -228,6 +249,20 @@ export async function runRefinement(): Promise<void> {
   _state.refinedChunks = [];
 
   try {
+    // Step 0: Check cache - skip processing if content unchanged and we have cached results
+    const forceRefinement = options?.force ?? false;
+    if (!forceRefinement && _state.sourceContentHash !== null && _state.refinedChunks.length > 0) {
+      const currentHash = computeContentHash(sourceContent);
+      if (currentHash === _state.sourceContentHash) {
+        // Content unchanged, use cached results
+        setRefinementState('complete');
+        setCurrentPhase(`Using cached refinement (${_state.refinedChunks.length} chunks)`);
+        logger.info(`Refinement: Using cached results (${_state.refinedChunks.length} chunks)`);
+        _state.isProcessing = false;
+        return;
+      }
+    }
+
     // Step 1: Parse into chunks using model's context window
     setRefinementState('chunking');
     setCurrentPhase('Parsing source into chunks...');
@@ -332,6 +367,8 @@ export async function runRefinement(): Promise<void> {
       });
       
       _state.refinedChunks = validChunks;
+      // Store content hash for cache
+      _state.sourceContentHash = computeContentHash(sourceContent);
       updatePhaseProgress(1);
       completeTaskPlan();
       setRefinementState('complete');
@@ -340,6 +377,8 @@ export async function runRefinement(): Promise<void> {
     } else {
       // Fall back to formatted chunks if refinement failed
       _state.refinedChunks = formattedChunks;
+      // Store content hash for cache
+      _state.sourceContentHash = computeContentHash(sourceContent);
       updatePhaseProgress(1);
       completeTaskPlan();
       setRefinementState('complete');
@@ -372,6 +411,7 @@ export function resetRefinement(): void {
   _state.chunkPhase = null;
   resetTaskPlan();
   clearStreamingText();
+  invalidateRefinementCache();
 }
 
 // ─── Extraction Pipeline ──────────────────────────────────────
@@ -582,5 +622,6 @@ export function resetFormatterState(): void {
   _state.chunkPhase = null;
   resetTaskPlan();
   clearStreamingText();
+  invalidateRefinementCache();
   clearLocalStorage();
 }
