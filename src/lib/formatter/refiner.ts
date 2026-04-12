@@ -3,7 +3,7 @@
  */
 
 import type { ChatMessage } from '../../types';
-import { getEngineInstance } from '../../engine/engine-factory';
+import type { FormatterBackend } from './backend';
 import type { CohesionAnalysis } from './cohesionAnalyzer';
 import { estimateTokenCount, getDefaultChunkSize } from './tokenizer';
 import { logger } from '../../logger';
@@ -21,14 +21,9 @@ export interface RefinementResult {
  */
 export async function refineChunks(
   chunks: string[],
-  analyses: CohesionAnalysis[]
+  analyses: CohesionAnalysis[],
+  backend: FormatterBackend
 ): Promise<RefinementResult> {
-  const engine = getEngineInstance();
-
-  if (!engine.isModelLoaded()) {
-    throw new Error('No model loaded. Please load a model first.');
-  }
-
   // Check if any refinement is needed
   const needsRefinement = analyses.some(a => a.hasIssues && a.issues.length > 0);
   
@@ -67,76 +62,60 @@ ${chunks.map((c, i) => `Chunk ${i + 1}:\n${c}`).join('\n\n')}
 
 Output the refined chunks separated by "---CHUNK_SEPARATOR---" (no other text):`;
 
-  return new Promise((resolve, reject) => {
-    const messages: ChatMessage[] = [
-      {
-        id: generateId(),
-        role: 'system',
-        content: systemPrompt,
-        timestamp: new Date().toISOString(),
-      },
-      {
-        id: generateId(),
-        role: 'user',
-        content: userPrompt,
-        timestamp: new Date().toISOString(),
-      },
-    ];
+  const messages: ChatMessage[] = [
+    {
+      id: generateId(),
+      role: 'system',
+      content: systemPrompt,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      id: generateId(),
+      role: 'user',
+      content: userPrompt,
+      timestamp: new Date().toISOString(),
+    },
+  ];
 
-    let fullResponse = '';
-
-    engine.sendMessage(
-      messages,
-      (token) => {
-        fullResponse += token;
-      },
-      (response) => {
-        try {
-          // Split by chunk separator
-          const refined = response
-            .split(/---CHUNK_SEPARATOR---/)
-            .map(c => c.trim())
-            .filter(c => c.length > 0);
-
-          // Validate that refined chunks are within size limits
-          const maxChars = getDefaultChunkSize() * 4;
-          const validChunks = refined.filter(c => {
-            const tokens = estimateTokenCount(c);
-            return tokens <= getDefaultChunkSize();
-          });
-
-          // If all chunks were lost, return original
-          if (validChunks.length === 0 && refined.length === 0) {
-            resolve({
-              refinedChunks: chunks,
-              success: true,
-            });
-            return;
-          }
-
-          resolve({
-            refinedChunks: validChunks.length > 0 ? validChunks : refined,
-            success: true,
-          });
-        } catch (err) {
-          logger.error('Error parsing refined chunks:', err);
-          resolve({
-            refinedChunks: chunks,
-            success: false,
-            error: 'Failed to parse refined chunks',
-          });
-        }
-      },
-      (error) => {
-        logger.error('Chunk refinement error:', error);
-        reject(error);
-      },
-      {
-        temperature: 0.5,
-        maxTokens: 4096,
-      }
-    );
+  const response = await backend.generate(messages, {
+    temperature: 0.5,
+    maxTokens: 4096,
   });
+
+  try {
+    // Split by chunk separator
+    const refined = response
+      .split(/---CHUNK_SEPARATOR---/)
+      .map(c => c.trim())
+      .filter(c => c.length > 0);
+
+    // Validate that refined chunks are within size limits
+    const maxChars = getDefaultChunkSize() * 4;
+    const validChunks = refined.filter(c => {
+      const tokens = estimateTokenCount(c);
+      return tokens <= getDefaultChunkSize();
+    });
+
+    // If all chunks were lost, return original
+    if (validChunks.length === 0 && refined.length === 0) {
+      return {
+        refinedChunks: chunks,
+        success: true,
+      };
+    }
+
+    return {
+      refinedChunks: validChunks.length > 0 ? validChunks : refined,
+      success: true,
+    };
+  } catch (err) {
+    logger.error('Error parsing refined chunks:', err);
+    return {
+      refinedChunks: chunks,
+      success: false,
+      error: 'Failed to parse refined chunks',
+    };
+  }
 }
 
 /**
@@ -145,10 +124,11 @@ Output the refined chunks separated by "---CHUNK_SEPARATOR---" (no other text):`
 export async function refineChunksWithTimeout(
   chunks: string[],
   analyses: CohesionAnalysis[],
+  backend: FormatterBackend,
   timeoutMs: number = 60000
 ): Promise<RefinementResult> {
   return Promise.race([
-    refineChunks(chunks, analyses),
+    refineChunks(chunks, analyses, backend),
     new Promise<RefinementResult>((_, reject) =>
       setTimeout(() => reject(new Error('Refinement timeout')), timeoutMs)
     ),

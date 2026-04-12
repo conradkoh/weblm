@@ -107,4 +107,9 @@ export interface FormatterState {
   extractionState: ExtractionState;
   extractionResults: ExtractionResult[];
   showAllResults: boolean;
+  // Cloud API configuration (Note: API key stored in localStorage - not production-secure)
+  cloudApiUrl: string;
+  cloudApiKey: string;
+  cloudApiModel: string;
+  useCloudApi: boolean;
 }

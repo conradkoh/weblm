@@ -11,6 +11,9 @@ import { parseIntoChunks } from '../lib/formatter/chunker';
 import { formatChunksToMarkdown } from '../lib/formatter/markdownFormatter';
 import { analyzeAllCohesions, type CohesionAnalysis } from '../lib/formatter/cohesionAnalyzer';
 import { refineChunks, type RefinementResult } from '../lib/formatter/refiner';
+import { LocalFormatterBackend } from '../lib/formatter/localBackend';
+import { CloudFormatterBackend } from '../lib/formatter/cloudBackend';
+import type { FormatterBackend } from '../lib/formatter/backend';
 import { getModelInfo } from '../config';
 import { estimateTokenCount } from '../lib/formatter/tokenizer';
 import { processChunks, type ExtractionProgress } from '../lib/formatter/extractionEngine';
@@ -31,6 +34,11 @@ const _state = $state<FormatterState>({
   extractionState: 'idle',
   extractionResults: [],
   showAllResults: false,
+  // Cloud API configuration (Note: API key stored in localStorage - not production-secure)
+  cloudApiUrl: '',
+  cloudApiKey: '',
+  cloudApiModel: 'gpt-4o-mini',
+  useCloudApi: false,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -102,6 +110,44 @@ export function setShowAllResults(show: boolean): void {
   _state.showAllResults = show;
 }
 
+// Cloud API configuration setters (Note: API key stored in localStorage - not production-secure)
+export function setCloudApiUrl(url: string): void {
+  _state.cloudApiUrl = url;
+  saveToLocalStorage();
+}
+
+export function setCloudApiKey(key: string): void {
+  _state.cloudApiKey = key;
+  saveToLocalStorage();
+}
+
+export function setCloudApiModel(model: string): void {
+  _state.cloudApiModel = model;
+  saveToLocalStorage();
+}
+
+export function setUseCloudApi(use: boolean): void {
+  _state.useCloudApi = use;
+  saveToLocalStorage();
+}
+
+/**
+ * Get the appropriate formatter backend based on current settings.
+ * Returns CloudFormatterBackend if useCloudApi is enabled and config is valid,
+ * otherwise returns LocalFormatterBackend.
+ */
+export function getFormatterBackend(): FormatterBackend {
+  if (_state.useCloudApi && _state.cloudApiKey && _state.cloudApiUrl) {
+    logger.info(`Using CloudFormatterBackend (concurrency: ${_state.useCloudApi ? 5 : 1})`);
+    return new CloudFormatterBackend({
+      apiUrl: _state.cloudApiUrl,
+      apiKey: _state.cloudApiKey,
+      model: _state.cloudApiModel,
+    });
+  }
+  return new LocalFormatterBackend();
+}
+
 // ─── Refinement Pipeline ──────────────────────────────────────
 
 /**
@@ -110,6 +156,9 @@ export function setShowAllResults(show: boolean): void {
  */
 export async function runRefinement(): Promise<void> {
   const { sourceContent } = _state;
+  // Get backend based on settings (cloud or local)
+  const backend = getFormatterBackend();
+  const concurrency = backend.recommendedConcurrency();
 
   if (!sourceContent.trim()) {
     setErrorMessage('Source content is empty');
@@ -143,10 +192,10 @@ export async function runRefinement(): Promise<void> {
     setCurrentPhase(`Formatting ${chunks.length} chunks to markdown...`);
     logger.info('Refinement: Starting markdown formatting');
     
-    const formattedChunks = await formatChunksToMarkdown(chunks, {
+    const formattedChunks = await formatChunksToMarkdown(chunks, backend, {
       temperature: 0.3,
       maxTokens: 2048,
-      concurrency: 1, // Sequential to avoid WebLLM "Already generating" conflicts
+      concurrency,
     });
     
     logger.info(`Refinement: Formatted ${formattedChunks.length} chunks`);
@@ -156,7 +205,7 @@ export async function runRefinement(): Promise<void> {
     setCurrentPhase('Analyzing chunk cohesion...');
     logger.info('Refinement: Starting cohesion analysis');
     
-    const analyses: CohesionAnalysis[] = await analyzeAllCohesions(formattedChunks);
+    const analyses: CohesionAnalysis[] = await analyzeAllCohesions(formattedChunks, backend);
     
     const issuesFound = analyses.filter(a => a.hasIssues).length;
     logger.info(`Refinement: Analyzed cohesion, found ${issuesFound} pairs with issues`);
@@ -166,7 +215,7 @@ export async function runRefinement(): Promise<void> {
     setCurrentPhase('Refining chunks based on analysis...');
     logger.info('Refinement: Starting chunk refinement');
     
-    const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses);
+    const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses, backend);
     
     if (refinementResult.success) {
       // Validate chunk sizes (800 tokens max, ~3200 chars)
@@ -215,6 +264,9 @@ export function resetRefinement(): void {
  */
 export async function runExtraction(): Promise<void> {
   const { refinedChunks, desiredFormat } = _state;
+  // Get backend based on settings (cloud or local)
+  const backend = getFormatterBackend();
+  const concurrency = backend.recommendedConcurrency();
 
   if (refinedChunks.length === 0) {
     setErrorMessage('No refined chunks available. Run refinement first.');
@@ -240,13 +292,14 @@ export async function runExtraction(): Promise<void> {
     const results = await processChunks(
       refinedChunks,
       desiredFormat,
-      { concurrency: 1 }, // Sequential to avoid WebLLM conflicts
+      { concurrency },
       (progress: ExtractionProgress) => {
         setCurrentPhase(progress.message);
         if (progress.phase === 'extracting') {
           setExtractionState('extracting');
         }
-      }
+      },
+      backend
     );
 
     _state.extractionResults = results;
@@ -296,6 +349,11 @@ interface StoredData {
   sourceContent: string;
   desiredFormat: string;
   selectedModelId: string | null;
+  // Cloud API configuration (Note: API key stored in localStorage - not production-secure)
+  cloudApiUrl: string;
+  cloudApiKey: string;
+  cloudApiModel: string;
+  useCloudApi: boolean;
 }
 
 function saveToLocalStorage(): void {
@@ -304,6 +362,10 @@ function saveToLocalStorage(): void {
       sourceContent: _state.sourceContent,
       desiredFormat: _state.desiredFormat,
       selectedModelId: _state.selectedModelId,
+      cloudApiUrl: _state.cloudApiUrl,
+      cloudApiKey: _state.cloudApiKey,
+      cloudApiModel: _state.cloudApiModel,
+      useCloudApi: _state.useCloudApi,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (err) {
@@ -319,6 +381,10 @@ export function loadFromLocalStorage(): void {
       _state.sourceContent = data.sourceContent ?? '';
       _state.desiredFormat = data.desiredFormat ?? '';
       _state.selectedModelId = data.selectedModelId ?? null;
+      _state.cloudApiUrl = data.cloudApiUrl ?? '';
+      _state.cloudApiKey = data.cloudApiKey ?? '';
+      _state.cloudApiModel = data.cloudApiModel ?? 'gpt-4o-mini';
+      _state.useCloudApi = data.useCloudApi ?? false;
       logger.debug('loaded formatter state from localStorage');
     }
   } catch (err) {
@@ -347,5 +413,10 @@ export function resetFormatterState(): void {
   _state.extractionState = 'idle';
   _state.extractionResults = [];
   _state.showAllResults = false;
+  // Reset cloud API settings but keep the values
+  _state.cloudApiUrl = '';
+  _state.cloudApiKey = '';
+  _state.cloudApiModel = 'gpt-4o-mini';
+  _state.useCloudApi = false;
   clearLocalStorage();
 }

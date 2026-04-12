@@ -4,7 +4,7 @@
  */
 
 import type { ChatMessage } from '../../types';
-import { getEngineInstance } from '../../engine/engine-factory';
+import type { FormatterBackend } from './backend';
 import { parseMarkdownToGraph, type Graph, getOrderedNodes } from './graphModel';
 import { logger } from '../../logger';
 import { generateId } from '../../types';
@@ -34,14 +34,9 @@ export function parseChunkToGraph(markdown: string): Graph {
 export async function extractFromChunk(
   chunk: string,
   desiredFormat: string,
-  chunkIndex: number
+  chunkIndex: number,
+  backend: FormatterBackend
 ): Promise<ExtractionResult> {
-  const engine = getEngineInstance();
-
-  if (!engine.isModelLoaded()) {
-    throw new Error('No model loaded. Please load a model first.');
-  }
-
   // First, check relevance using LLM
   const relevancePrompt = `You are a content extraction assistant. Your task is to:
 1. Evaluate the relevance of the given chunk to the desired format criteria
@@ -69,86 +64,71 @@ ${chunk}
 
 Output only JSON, no other text:`;
 
-  return new Promise((resolve, reject) => {
-    const messages: ChatMessage[] = [
-      {
-        id: generateId(),
-        role: 'system',
-        content: systemPrompt,
-        timestamp: new Date().toISOString(),
-      },
-      {
-        id: generateId(),
-        role: 'user',
-        content: userPrompt,
-        timestamp: new Date().toISOString(),
-      },
-    ];
+  const messages: ChatMessage[] = [
+    {
+      id: generateId(),
+      role: 'system',
+      content: systemPrompt,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      id: generateId(),
+      role: 'user',
+      content: userPrompt,
+      timestamp: new Date().toISOString(),
+    },
+  ];
 
-    let fullResponse = '';
-
-    engine.sendMessage(
-      messages,
-      (token) => {
-        fullResponse += token;
-      },
-      (response) => {
-        try {
-          // Try to parse JSON from the response
-          const jsonMatch = response.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            
-            // Check for NOT RELEVANT special case
-            const extractedContent = parsed.extractedContent || '';
-            if (parsed.relevance === 'none' || !parsed.relevant) {
-              resolve({
-                chunkId: chunkIndex,
-                content: '<NOT RELEVANT>',
-                relevance: 'none',
-                reasoning: parsed.reasoning || 'Content not relevant to desired format',
-              });
-            } else {
-              resolve({
-                chunkId: chunkIndex,
-                content: extractedContent || chunk,
-                relevance: parsed.relevance || 'medium',
-                reasoning: parsed.reasoning || 'Content extracted based on relevance',
-              });
-            }
-          } else {
-            // If JSON parsing fails, do a simple relevance check
-            const isRelevant = response.toLowerCase().includes('relevant') && 
-                              !response.toLowerCase().includes('not relevant');
-            
-            resolve({
-              chunkId: chunkIndex,
-              content: isRelevant ? chunk : '<NOT RELEVANT>',
-              relevance: isRelevant ? 'medium' : 'none',
-              reasoning: 'Fallback: simple relevance check performed',
-            });
-          }
-        } catch (err) {
-          logger.error('Error parsing extraction result JSON:', err);
-          // Fallback: assume medium relevance if parsing fails
-          resolve({
-            chunkId: chunkIndex,
-            content: chunk,
-            relevance: 'medium',
-            reasoning: 'Fallback: parsing failed, using original content',
-          });
-        }
-      },
-      (error) => {
-        logger.error('Extraction error:', error);
-        reject(error);
-      },
-      {
-        temperature: 0.3,
-        maxTokens: 2048,
-      }
-    );
+  const response = await backend.generate(messages, {
+    temperature: 0.3,
+    maxTokens: 2048,
   });
+
+  try {
+    // Try to parse JSON from the response
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      // Check for NOT RELEVANT special case
+      const extractedContent = parsed.extractedContent || '';
+      if (parsed.relevance === 'none' || !parsed.relevant) {
+        return {
+          chunkId: chunkIndex,
+          content: '<NOT RELEVANT>',
+          relevance: 'none',
+          reasoning: parsed.reasoning || 'Content not relevant to desired format',
+        };
+      } else {
+        return {
+          chunkId: chunkIndex,
+          content: extractedContent || chunk,
+          relevance: parsed.relevance || 'medium',
+          reasoning: parsed.reasoning || 'Content extracted based on relevance',
+        };
+      }
+    } else {
+      // If JSON parsing fails, do a simple relevance check
+      const isRelevant = response.toLowerCase().includes('relevant') && 
+                        !response.toLowerCase().includes('not relevant');
+      
+      return {
+        chunkId: chunkIndex,
+        content: isRelevant ? chunk : '<NOT RELEVANT>',
+        relevance: isRelevant ? 'medium' : 'none',
+        reasoning: 'Fallback: simple relevance check performed',
+      };
+    }
+  } catch (err) {
+    logger.error('Error parsing extraction result JSON:', err);
+    // Fallback: assume medium relevance if parsing fails
+    return {
+      chunkId: chunkIndex,
+      content: chunk,
+      relevance: 'medium',
+      reasoning: 'Fallback: parsing failed, using original content',
+    };
+  }
 }
 
 /**
@@ -156,7 +136,8 @@ Output only JSON, no other text:`;
  */
 export async function extractFromGraph(
   graph: Graph,
-  desiredFormat: string
+  desiredFormat: string,
+  backend: FormatterBackend
 ): Promise<ExtractionResult[]> {
   const results: ExtractionResult[] = [];
   const nodes = getOrderedNodes(graph);
@@ -169,7 +150,8 @@ export async function extractFromGraph(
       const result = await extractFromChunk(
         `## ${node.title}\n\n${node.content}`,
         desiredFormat,
-        i
+        i,
+        backend
       );
       result.nodeId = node.id;
       result.title = node.title;
@@ -195,24 +177,34 @@ export async function extractFromGraph(
  */
 export async function extractFromRawChunks(
   chunks: string[],
-  desiredFormat: string
+  desiredFormat: string,
+  backend: FormatterBackend
 ): Promise<ExtractionResult[]> {
   const results: ExtractionResult[] = [];
+  const concurrency = backend.recommendedConcurrency();
 
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i] ?? '';
-    try {
-      const result = await extractFromChunk(chunk, desiredFormat, i);
-      results.push(result);
-    } catch (err) {
-      logger.error(`Error extracting from chunk ${i}:`, err);
-      results.push({
-        chunkId: i,
-        content: '<ERROR>',
-        relevance: 'none',
-        reasoning: `Extraction failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-      });
+  for (let i = 0; i < chunks.length; i += concurrency) {
+    const batch: Promise<ExtractionResult>[] = [];
+    
+    for (let j = 0; j < concurrency && i + j < chunks.length; j++) {
+      const idx = i + j;
+      const chunk = chunks[idx] ?? '';
+      
+      batch.push(
+        extractFromChunk(chunk, desiredFormat, idx, backend).catch(err => {
+          logger.error(`Error extracting from chunk ${idx}:`, err);
+          return {
+            chunkId: idx,
+            content: '<ERROR>',
+            relevance: 'none' as RelevanceLevel,
+            reasoning: `Extraction failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          };
+        })
+      );
     }
+    
+    const batchResults = await Promise.all(batch);
+    results.push(...batchResults);
   }
 
   return results;

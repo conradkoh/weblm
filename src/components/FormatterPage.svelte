@@ -25,6 +25,10 @@
     runExtraction,
     resetExtraction,
     toggleShowAllResults,
+    setCloudApiUrl,
+    setCloudApiKey,
+    setCloudApiModel,
+    setUseCloudApi,
   } from '../stores/formatterStore.svelte';
   import type { ExtractionResult } from '../stores/types';
 
@@ -112,6 +116,28 @@
   function handleToggleShowAll(): void {
     toggleShowAllResults();
   }
+
+  function handleCloudApiToggle(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    setUseCloudApi(target.checked);
+  }
+
+  function handleCloudApiUrlChange(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    setCloudApiUrl(target.value);
+  }
+
+  function handleCloudApiKeyChange(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    setCloudApiKey(target.value);
+  }
+
+  function handleCloudApiModelChange(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    setCloudApiModel(target.value);
+  }
+
+  let cloudSettingsExpanded = $state(false);
 
   function handleCopyToClipboard(result: ExtractionResult): void {
     const text = result.title ? `## ${result.title}\n\n${result.content}` : result.content;
@@ -203,6 +229,18 @@
         )
   );
 
+  // Check if cloud API is properly configured
+  const cloudApiConfigured = $derived(
+    formatterState.useCloudApi && 
+    formatterState.cloudApiKey.trim() !== '' && 
+    formatterState.cloudApiUrl.trim() !== ''
+  );
+
+  // Get backend type indicator for display
+  const backendTypeLabel = $derived(
+    cloudApiConfigured ? `Cloud API (concurrency: 5)` : `Local Engine (concurrency: 1)`
+  );
+
   // Get relevance badge class
   function getRelevanceBadgeClass(relevance: string): string {
     switch (relevance) {
@@ -264,6 +302,91 @@
     </div>
   </div>
   <Separator />
+
+  <!-- Cloud API Settings (Collapsible) -->
+  <div class="px-4 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+    <button
+      type="button"
+      class="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 w-full"
+      onclick={() => cloudSettingsExpanded = !cloudSettingsExpanded}
+    >
+      <span>{cloudSettingsExpanded ? '▼' : '▶'}</span>
+      <span>⚙️ Cloud API Settings</span>
+      {#if cloudApiConfigured}
+        <span class="text-xs px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400">
+          ✓ Configured
+        </span>
+      {:else if formatterState.useCloudApi}
+        <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400">
+          ⚠ Incomplete
+        </span>
+      {/if}
+    </button>
+    {#if cloudSettingsExpanded}
+      <div class="mt-2 p-3 bg-white dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
+        <label class="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            checked={formatterState.useCloudApi}
+            onchange={handleCloudApiToggle}
+            class="rounded border-gray-300 dark:border-slate-600"
+          />
+          <span class="text-sm font-medium text-gray-700 dark:text-slate-300">Use Cloud API</span>
+          {#if formatterState.useCloudApi}
+            <span class="text-xs text-gray-500 dark:text-slate-500">({backendTypeLabel})</span>
+          {/if}
+        </label>
+        {#if formatterState.useCloudApi}
+          <div class="space-y-3">
+            <div>
+              <label for="cloud-api-url" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                API URL
+              </label>
+              <input
+                id="cloud-api-url"
+                type="text"
+                value={formatterState.cloudApiUrl}
+                oninput={handleCloudApiUrlChange}
+                placeholder="https://api.openai.com/v1"
+                class="w-full px-3 py-1.5 text-sm rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900"
+              />
+            </div>
+            <div>
+              <label for="cloud-api-key" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                API Key
+              </label>
+              <input
+                id="cloud-api-key"
+                type="password"
+                value={formatterState.cloudApiKey}
+                oninput={handleCloudApiKeyChange}
+                placeholder="sk-..."
+                class="w-full px-3 py-1.5 text-sm rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900"
+              />
+              <p class="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                Note: API key is stored in localStorage (not production-secure)
+              </p>
+            </div>
+            <div>
+              <label for="cloud-api-model" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                Model
+              </label>
+              <input
+                id="cloud-api-model"
+                type="text"
+                value={formatterState.cloudApiModel}
+                oninput={handleCloudApiModelChange}
+                placeholder="gpt-4o-mini"
+                class="w-full px-3 py-1.5 text-sm rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900"
+              />
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </div>
+  <Separator />
+
   <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 min-h-0 overflow-hidden">
     <!-- Source Column -->
     <div class="flex flex-col gap-2 min-h-0">

@@ -8,13 +8,14 @@ import { parseChunkToGraph } from './extractor';
 import {
   extractFromChunk, 
   extractFromGraph,
-  extractFromRawChunks,
   filterByRelevance,
   getRelevantResults,
   getExtractionStats,
   type ExtractionResult,
   type RelevanceLevel
 } from './extractor';
+import type { FormatterBackend } from './backend';
+import { LocalFormatterBackend } from './localBackend';
 import { logger } from '../../logger';
 
 export interface ExtractionProgress {
@@ -25,6 +26,8 @@ export interface ExtractionProgress {
 }
 
 export interface ExtractionEngineOptions {
+  /** Backend for LLM calls (local or cloud). Defaults to LocalFormatterBackend */
+  backend?: FormatterBackend;
   /** Concurrency limit for parallel LLM calls */
   concurrency?: number;
   /** Minimum relevance threshold (default: 'low') */
@@ -33,7 +36,8 @@ export interface ExtractionEngineOptions {
   timeoutMs?: number;
 }
 
-const DEFAULT_OPTIONS: Required<ExtractionEngineOptions> = {
+const DEFAULT_OPTIONS: Omit<Required<ExtractionEngineOptions>, 'backend'> & { backend: FormatterBackend } = {
+  backend: new LocalFormatterBackend(),
   concurrency: 2,
   minRelevance: 'low',
   timeoutMs: 30000,
@@ -47,9 +51,12 @@ export async function processChunks(
   refinedChunks: string[],
   desiredFormat: string,
   options: ExtractionEngineOptions = {},
-  onProgress?: (progress: ExtractionProgress) => void
+  onProgress?: (progress: ExtractionProgress) => void,
+  backend?: FormatterBackend
 ): Promise<ExtractionResult[]> {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+  // Use provided backend or create default
+  const effectiveBackend = backend ?? options.backend ?? new LocalFormatterBackend();
+  const opts = { ...DEFAULT_OPTIONS, backend: effectiveBackend, ...options };
 
   if (!desiredFormat.trim()) {
     throw new Error('Desired format is required for extraction');
@@ -61,6 +68,7 @@ export async function processChunks(
 
   const results: ExtractionResult[] = [];
   const total = refinedChunks.length;
+  const concurrency = opts.concurrency ?? effectiveBackend.recommendedConcurrency();
 
   try {
     // Phase 1: Parse chunks to graphs (if they contain markdown headers)
@@ -94,8 +102,8 @@ export async function processChunks(
     });
 
     // Process chunks in batches with concurrency limit
-    for (let i = 0; i < graphs.length; i += opts.concurrency) {
-      const batch = graphs.slice(i, i + opts.concurrency);
+    for (let i = 0; i < graphs.length; i += concurrency) {
+      const batch = graphs.slice(i, i + concurrency);
       const batchPromises = batch.map(async (graph, batchIndex) => {
         const chunkIndex = i + batchIndex;
         const chunk = refinedChunks[chunkIndex];
@@ -106,11 +114,11 @@ export async function processChunks(
           
           if (nodes.length > 1) {
             // Has multiple sections - use graph extraction
-            return await extractFromGraph(graph, desiredFormat);
+            return await extractFromGraph(graph, desiredFormat, effectiveBackend);
           } else {
             const chunk = refinedChunks[chunkIndex] ?? '';
             // Single chunk - use direct extraction
-            return [await extractFromChunk(chunk, desiredFormat, chunkIndex)];
+            return [await extractFromChunk(chunk, desiredFormat, chunkIndex, effectiveBackend)];
           }
         } catch (err) {
           logger.error(`Error extracting from chunk ${chunkIndex}:`, err);
@@ -131,9 +139,9 @@ export async function processChunks(
 
       onProgress?.({
         phase: 'extracting',
-        current: Math.min(i + opts.concurrency, total),
+        current: Math.min(i + concurrency, total),
         total,
-        message: `Extracted ${Math.min(i + opts.concurrency, total)} of ${total} chunks`,
+        message: `Extracted ${Math.min(i + concurrency, total)} of ${total} chunks`,
       });
     }
 
@@ -169,12 +177,13 @@ export async function processChunksWithTimeout(
   refinedChunks: string[],
   desiredFormat: string,
   options: ExtractionEngineOptions = {},
-  onProgress?: (progress: ExtractionProgress) => void
+  onProgress?: (progress: ExtractionProgress) => void,
+  backend?: FormatterBackend
 ): Promise<ExtractionResult[]> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_OPTIONS.timeoutMs;
   
   return Promise.race([
-    processChunks(refinedChunks, desiredFormat, options, onProgress),
+    processChunks(refinedChunks, desiredFormat, options, onProgress, backend),
     new Promise<ExtractionResult[]>((_, reject) =>
       setTimeout(() => reject(new Error('Extraction timeout')), timeoutMs)
     ),
