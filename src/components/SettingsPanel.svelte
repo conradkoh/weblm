@@ -2,22 +2,13 @@
   /**
    * SettingsPanel component.
    * Modal dialog for adjusting generation parameters, system prompt, theme, and export.
+   * Reads from and writes to the settings store.
    */
 
-  import {
-    loadSettings,
-    saveSettings,
-    getTemperature, setTemperature,
-    getMaxTokens, setMaxTokens,
-    getTopP, setTopP,
-    getSystemPrompt, setSystemPrompt,
-    getTheme, setTheme,
-    getShowMetrics, setShowMetrics,
-    type Theme,
-  } from '../settings';
-  import { applyThemeByName } from '../lib/themes';
+  import { getSettingsState, applySettings } from '../stores/settingsStore.svelte';
   import { exportChatAsText, exportChatAsMarkdown } from '../app/export';
   import type { ChatMessage } from '../types';
+  import type { Theme } from '../stores/types';
 
   interface Props {
     open: boolean;
@@ -27,33 +18,30 @@
 
   let { open, messages, onClose }: Props = $props();
 
-  // Local state initialized from settings on open
-  let temperature = $state(getTemperature());
-  let maxTokens = $state(getMaxTokens());
-  let topP = $state(getTopP());
-  let systemPrompt = $state(getSystemPrompt());
-  let theme = $state<Theme>(getTheme());
-  let showMetrics = $state(getShowMetrics());
+  const settings = getSettingsState();
 
+  // Local copies for editing (avoid mutating store until Save)
+  let temperature = $state(settings.temperature);
+  let maxTokens = $state(settings.maxTokens);
+  let topP = $state(settings.topP);
+  let systemPrompt = $state(settings.systemPrompt);
+  let theme = $state<Theme>(settings.theme);
+  let showMetrics = $state(settings.showMetrics);
+
+  // Re-sync local copies when panel opens
   $effect(() => {
     if (open) {
-      temperature = getTemperature();
-      maxTokens = getMaxTokens();
-      topP = getTopP();
-      systemPrompt = getSystemPrompt();
-      theme = getTheme();
-      showMetrics = getShowMetrics();
+      temperature = settings.temperature;
+      maxTokens = settings.maxTokens;
+      topP = settings.topP;
+      systemPrompt = settings.systemPrompt;
+      theme = settings.theme;
+      showMetrics = settings.showMetrics;
     }
   });
 
   function handleSave(): void {
-    setTemperature(temperature);
-    setMaxTokens(maxTokens);
-    setTopP(topP);
-    setSystemPrompt(systemPrompt);
-    setTheme(theme);
-    setShowMetrics(showMetrics);
-    applyThemeByName(theme);
+    applySettings({ temperature, maxTokens, topP, systemPrompt, theme, showMetrics });
     onClose();
   }
 

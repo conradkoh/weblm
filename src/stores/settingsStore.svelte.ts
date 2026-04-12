@@ -1,20 +1,35 @@
 /**
- * Settings store — reactive wrapper around localStorage-backed settings.
+ * Settings store — reactive wrapper around src/settings.ts.
  *
- * Keeps an in-memory reactive copy of settings so components
- * can subscribe to changes without polling localStorage.
+ * Provides reactive state for all user-configurable settings.
+ * The underlying src/settings.ts module handles localStorage persistence.
+ * This store adds Svelte 5 reactivity on top.
  */
 
 import type { SettingsState, Theme } from './types';
-import { DEFAULT_SETTINGS } from '../settings';
+import {
+  loadSettings,
+  saveSettings,
+  resetSettings as resetSettingsStorage,
+  setTemperature as persistTemperature,
+  setMaxTokens as persistMaxTokens,
+  setTopP as persistTopP,
+  setSystemPrompt as persistSystemPrompt,
+  setTheme as persistTheme,
+  setShowMetrics as persistShowMetrics,
+} from '../settings';
+import { applyThemeByName } from '../lib/themes';
 
+// ─── State ────────────────────────────────────────────────────
+
+const _saved = loadSettings();
 const _state = $state<SettingsState>({
-  temperature: DEFAULT_SETTINGS.temperature,
-  maxTokens: DEFAULT_SETTINGS.maxTokens,
-  topP: DEFAULT_SETTINGS.topP,
-  systemPrompt: DEFAULT_SETTINGS.systemPrompt,
-  theme: DEFAULT_SETTINGS.theme,
-  showMetrics: DEFAULT_SETTINGS.showMetrics,
+  temperature: _saved.temperature,
+  maxTokens: _saved.maxTokens,
+  topP: _saved.topP,
+  systemPrompt: _saved.systemPrompt,
+  theme: _saved.theme,
+  showMetrics: _saved.showMetrics,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -26,17 +41,56 @@ export function getSettingsState(): SettingsState {
 
 // ─── Mutations ────────────────────────────────────────────────
 
-/** Load settings from localStorage into the reactive store. */
+/** Load settings from localStorage into the reactive store (call on init). */
 export function loadSettingsIntoStore(): void {
-  // TODO: implement
+  const saved = loadSettings();
+  _state.temperature = saved.temperature;
+  _state.maxTokens = saved.maxTokens;
+  _state.topP = saved.topP;
+  _state.systemPrompt = saved.systemPrompt;
+  _state.theme = saved.theme;
+  _state.showMetrics = saved.showMetrics;
 }
 
-/** Persist and apply a partial settings update. */
-export function applySettings(_patch: Partial<SettingsState>): void {
-  // TODO: implement
+/** Apply a partial settings update to both reactive state and localStorage. */
+export function applySettings(patch: Partial<SettingsState>): void {
+  if (patch.temperature !== undefined) {
+    _state.temperature = patch.temperature;
+    persistTemperature(patch.temperature);
+  }
+  if (patch.maxTokens !== undefined) {
+    _state.maxTokens = patch.maxTokens;
+    persistMaxTokens(patch.maxTokens);
+  }
+  if (patch.topP !== undefined) {
+    _state.topP = patch.topP;
+    persistTopP(patch.topP);
+  }
+  if (patch.systemPrompt !== undefined) {
+    _state.systemPrompt = patch.systemPrompt;
+    persistSystemPrompt(patch.systemPrompt);
+  }
+  if (patch.theme !== undefined) {
+    _state.theme = patch.theme;
+    persistTheme(patch.theme);
+    applyThemeByName(patch.theme);
+  }
+  if (patch.showMetrics !== undefined) {
+    _state.showMetrics = patch.showMetrics;
+    persistShowMetrics(patch.showMetrics);
+  }
 }
 
-/** Apply just the theme (also updates CSS vars). */
-export function applyTheme(_theme: Theme): void {
-  // TODO: implement
+/** Apply just the theme (updates reactive state, persists, and updates CSS vars). */
+export function applyTheme(theme: Theme): void {
+  _state.theme = theme;
+  persistTheme(theme);
+  applyThemeByName(theme);
+}
+
+/** Reset settings to defaults (both state and localStorage). */
+export function resetSettings(): void {
+  resetSettingsStorage();
+  loadSettingsIntoStore();
+  applyThemeByName(_state.theme);
 }
