@@ -20,6 +20,8 @@
     clearUploadedFile,
   } from '../stores/chatStore.svelte';
   import { getEngineState } from '../stores/engineStore.svelte';
+  import { Button } from '$ui/button';
+  import { Separator } from '$ui/separator';
 
   interface Props {
     modelId: string;
@@ -59,24 +61,27 @@
 
 <div class="flex-1 flex flex-col w-full max-w-[800px] mx-auto h-full overflow-hidden">
   <!-- Header -->
-  <div class="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 flex-shrink-0">
+  <div class="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-slate-800 flex-shrink-0">
     <span class="font-semibold text-gray-900 dark:text-slate-100 text-sm">{modelDisplayName}</span>
     <div class="flex items-center gap-2">
-      <button
-        class="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium font-[inherit] text-gray-900 dark:text-slate-100 bg-transparent border border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-slate-800 hover:border-indigo-600 dark:hover:border-indigo-400"
+      <Button
+        variant="outline"
+        size="sm"
         title="Start a new conversation"
         onclick={handleNewChat}
       >
         + New Chat
-      </button>
-      <button
-        class="flex items-center justify-center w-8 h-8 p-0 text-lg bg-transparent border-none rounded-lg cursor-pointer transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-slate-700"
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
         title="Settings"
         aria-label="Open settings"
         onclick={() => { showSettings = true; }}
-      >⚙️</button>
+      >⚙️</Button>
     </div>
   </div>
+  <Separator />
 
   <!-- Messages -->
   <div class="flex-1 flex flex-col overflow-hidden">
@@ -91,7 +96,8 @@
   {/if}
 
   <!-- Input area -->
-  <div class="flex items-end gap-1 px-2 bg-gray-50 dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 flex-shrink-0">
+  <Separator />
+  <div class="flex items-end gap-1 px-2 bg-gray-50 dark:bg-slate-800 flex-shrink-0">
     <Upload
       uploadedFile={chatState.uploadedFile}
       onFileLoaded={(f) => setUploadedFile(f)}

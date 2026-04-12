@@ -7,6 +7,7 @@
   import { tick } from 'svelte';
   import ChatMessageItem from './ChatMessage.svelte';
   import type { ChatMessage } from '../types';
+  import { ScrollArea } from '$ui/scroll-area';
 
   interface Props {
     messages: ChatMessage[];
@@ -14,7 +15,8 @@
 
   let { messages }: Props = $props();
 
-  let containerEl: HTMLElement | undefined = $state();
+  // viewportRef gives us access to the ScrollArea's scrollable viewport
+  let viewportRef: HTMLElement | null = $state(null);
 
   // Auto-scroll when messages change
   $effect(() => {
@@ -25,32 +27,37 @@
   });
 
   function scrollToBottom(): void {
-    if (!containerEl) return;
+    const el = viewportRef;
+    if (!el) return;
     const threshold = 100;
     const isNearBottom =
-      containerEl.scrollHeight - containerEl.scrollTop - containerEl.clientHeight < threshold;
+      el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
     if (isNearBottom) {
-      containerEl.scrollTop = containerEl.scrollHeight;
+      el.scrollTop = el.scrollHeight;
     }
   }
 
   // Expose scroll to bottom for external call (e.g. after token stream)
   export function forceScrollToBottom(): void {
-    if (containerEl) {
-      containerEl.scrollTop = containerEl.scrollHeight;
+    if (viewportRef) {
+      viewportRef.scrollTop = viewportRef.scrollHeight;
     }
   }
 </script>
 
-<div
-  class="flex-1 overflow-y-auto p-4 flex flex-col gap-4"
+<ScrollArea
+  class="flex-1 h-full"
+  bind:viewportRef
   id="chat-messages"
-  role="log"
-  aria-live="polite"
-  aria-label="Chat messages"
-  bind:this={containerEl}
 >
-  {#each messages as message (message.id)}
-    <ChatMessageItem {message} />
-  {/each}
-</div>
+  <div
+    class="p-4 flex flex-col gap-4"
+    role="log"
+    aria-live="polite"
+    aria-label="Chat messages"
+  >
+    {#each messages as message (message.id)}
+      <ChatMessageItem {message} />
+    {/each}
+  </div>
+</ScrollArea>

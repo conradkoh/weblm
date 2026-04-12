@@ -4,6 +4,9 @@
    * Auto-resizing textarea with Send/Stop buttons and Enter-to-send.
    */
 
+  import { Button } from '$ui/button';
+  import { Textarea } from '$ui/textarea';
+
   interface Props {
     disabled?: boolean;
     isGenerating?: boolean;
@@ -14,20 +17,14 @@
   let { disabled = false, isGenerating = false, onSend, onStop }: Props = $props();
 
   let value = $state('');
-  let textareaEl: HTMLTextAreaElement | undefined = $state();
+  let textareaRef: HTMLTextAreaElement | null = $state(null);
 
   const canSend = $derived(value.trim().length > 0 && !disabled && !isGenerating);
 
   $effect(() => {
     // Focus textarea when component mounts
-    textareaEl?.focus();
+    textareaRef?.focus();
   });
-
-  function handleInput(): void {
-    if (!textareaEl) return;
-    textareaEl.style.height = 'auto';
-    textareaEl.style.height = `${Math.min(textareaEl.scrollHeight, 200)}px`;
-  }
 
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -40,49 +37,43 @@
     const text = value.trim();
     if (!text || disabled || isGenerating) return;
     value = '';
-    // Reset height
-    if (textareaEl) {
-      textareaEl.style.height = 'auto';
-    }
     onSend(text);
   }
 
   export function focus(): void {
-    textareaEl?.focus();
+    textareaRef?.focus();
   }
 </script>
 
 <div class="flex gap-2 p-3" role="form" aria-label="Message input form">
-  <textarea
-    class="flex-1 px-3 py-2 text-base font-[inherit] leading-6 text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg resize-none outline-none transition-[border-color] duration-150 focus:border-indigo-600 dark:focus:border-indigo-400 disabled:bg-gray-50 dark:disabled:bg-slate-800 disabled:text-gray-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed placeholder:text-gray-500 dark:placeholder:text-slate-400"
+  <Textarea
+    bind:ref={textareaRef}
+    bind:value
+    class="flex-1 min-h-[40px] max-h-[200px] resize-none text-base leading-6"
     placeholder="Type a message..."
     rows={1}
     aria-label="Message input"
     disabled={disabled || isGenerating}
-    bind:value
-    bind:this={textareaEl}
-    oninput={handleInput}
     onkeydown={handleKeydown}
-  ></textarea>
+  />
 
   <div class="flex gap-2 items-end">
     {#if isGenerating}
-      <button
-        class="btn btn-danger"
+      <Button
+        variant="destructive"
         aria-label="Stop generation"
         onclick={onStop}
       >
         Stop
-      </button>
+      </Button>
     {:else}
-      <button
-        class="btn"
+      <Button
         aria-label="Send message"
         disabled={!canSend}
         onclick={handleSend}
       >
         Send
-      </button>
+      </Button>
     {/if}
   </div>
 </div>

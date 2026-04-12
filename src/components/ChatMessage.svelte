@@ -7,6 +7,7 @@
   import { renderMarkdown } from '../lib/markdown';
   import { highlightCode } from '../lib/highlight';
   import type { ChatMessage } from '../types';
+  import { Button } from '$ui/button';
 
   interface Props {
     message: ChatMessage;
@@ -103,17 +104,20 @@
         <div class="text-[11px] opacity-70 {message.role === 'user' ? 'text-white/80' : 'text-gray-500 dark:text-slate-400'}">
           {formatTimestamp(message.timestamp)}
         </div>
-        <button
-          class="text-[11px] px-2 py-0.5 border rounded font-[inherit] cursor-pointer transition-all duration-150
-            {messageCopied
-              ? 'bg-green-500 border-green-500 text-white'
-              : 'border-gray-200 dark:border-slate-700 bg-transparent text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:border-indigo-600 dark:hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'}"
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-auto px-2 py-0.5 text-[11px] {messageCopied
+            ? 'bg-green-500 text-white hover:bg-green-500'
+            : message.role === 'user'
+              ? 'text-white/80 hover:text-white hover:bg-white/20'
+              : 'text-gray-500 dark:text-slate-400'}"
           aria-label="Copy message"
           title="Copy message"
           onclick={copyMessage}
         >
           {messageCopied ? 'Copied!' : 'Copy'}
-        </button>
+        </Button>
       </div>
     {/if}
   </div>
