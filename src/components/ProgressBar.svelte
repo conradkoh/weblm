@@ -28,130 +28,44 @@
 </script>
 
 <div
-  class="progress-container"
+  class="w-full max-w-[500px] mt-6 p-6 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700"
   role="progressbar"
   aria-label="Model download progress"
   aria-valuemin={0}
   aria-valuemax={100}
   aria-valuenow={progress ? Math.round(progress.progress) : 0}
 >
-  <div class="progress-info">
-    <span class="progress-phase">{phaseLabel()}</span>
-    <span class="progress-percent">{progress ? Math.round(progress.progress) : 0}%</span>
+  <div class="flex justify-between items-center mb-2">
+    <span class="text-sm text-gray-900 dark:text-slate-100 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+      {phaseLabel()}
+    </span>
+    <span class="text-sm font-semibold text-indigo-600 dark:text-indigo-400 ml-2">
+      {progress ? Math.round(progress.progress) : 0}%
+    </span>
   </div>
 
-  <div class="progress-bar-outer">
+  <div class="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
     <div
-      class="progress-bar-inner"
+      class="h-full bg-indigo-600 dark:bg-indigo-400 rounded-full transition-[width] duration-200 ease-linear"
       aria-hidden="true"
       style="width: {progress ? progress.progress : 0}%"
     ></div>
   </div>
 
   {#if progress?.timeElapsed !== undefined}
-    <div class="progress-time">Time elapsed: {Math.round(progress.timeElapsed)}s</div>
+    <div class="text-sm text-gray-500 dark:text-slate-400 mt-2">Time elapsed: {Math.round(progress.timeElapsed)}s</div>
   {:else}
-    <div class="progress-time">Time elapsed: 0s</div>
+    <div class="text-sm text-gray-500 dark:text-slate-400 mt-2">Time elapsed: 0s</div>
   {/if}
 
   {#if error}
-    <div class="progress-error" role="alert">
-      <p class="error-message">{error}</p>
+    <div class="mt-4 p-4 bg-red-50 dark:bg-red-950 border border-red-500 rounded-lg" role="alert">
+      <p class="text-red-500 text-sm m-0 mb-2">{error}</p>
       {#if onRetry}
-        <button class="retry-button" aria-label="Retry loading model" onclick={onRetry}>
+        <button class="btn text-sm px-4 py-1" aria-label="Retry loading model" onclick={onRetry}>
           Try Again
         </button>
       {/if}
     </div>
   {/if}
 </div>
-
-<style>
-  .progress-container {
-    width: 100%;
-    max-width: 500px;
-    margin-top: var(--spacing-lg);
-    padding: var(--spacing-lg);
-    background-color: var(--color-surface);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--color-border);
-  }
-
-  .progress-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .progress-phase {
-    font-size: var(--font-size-sm);
-    color: var(--color-text);
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .progress-percent {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--color-primary);
-    margin-left: var(--spacing-sm);
-  }
-
-  .progress-bar-outer {
-    width: 100%;
-    height: 8px;
-    background-color: var(--color-border);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .progress-bar-inner {
-    height: 100%;
-    background-color: var(--color-primary);
-    border-radius: 4px;
-    transition: width 0.2s ease;
-  }
-
-  .progress-time {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    margin-top: var(--spacing-sm);
-  }
-
-  .progress-error {
-    margin-top: var(--spacing-md);
-    padding: var(--spacing-md);
-    background-color: #fef2f2;
-    border: 1px solid var(--color-error);
-    border-radius: var(--border-radius);
-  }
-
-  .error-message {
-    color: var(--color-error);
-    font-size: var(--font-size-sm);
-    margin: 0 0 var(--spacing-sm) 0;
-  }
-
-  .retry-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-xs) var(--spacing-md);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    font-family: inherit;
-    color: white;
-    background-color: var(--color-primary);
-    border: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-  }
-
-  .retry-button:hover {
-    background-color: #4338ca;
-  }
-</style>

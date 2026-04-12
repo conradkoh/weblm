@@ -71,18 +71,18 @@
   }
 </script>
 
-<div class="launcher-screen">
-  <div class="launcher-card">
+<div class="flex items-center justify-center min-h-full px-6 py-8">
+  <div class="w-full max-w-[480px] flex flex-col gap-6">
     <!-- Hero -->
-    <div class="launcher-hero">
-      <div class="launcher-logo">🧠</div>
-      <h1 class="launcher-title">WebLM</h1>
-      <p class="launcher-subtitle">Local AI Chat — Private &amp; Fast</p>
+    <div class="text-center pb-2">
+      <div class="text-5xl leading-none mb-2">🧠</div>
+      <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100 m-0 mb-1">WebLM</h1>
+      <p class="text-base text-gray-500 dark:text-slate-400 m-0">Local AI Chat — Private &amp; Fast</p>
     </div>
 
     <!-- Storage status -->
     {#if storageStatus}
-      <p class="launcher-storage">{storageStatus}</p>
+      <p class="text-center text-sm text-gray-500 dark:text-slate-400 opacity-80 -mt-4">{storageStatus}</p>
     {/if}
 
     <!-- Model selector -->
@@ -102,9 +102,9 @@
     {/if}
 
     <!-- Action buttons -->
-    <div class="launcher-buttons">
+    <div class="flex flex-col gap-2">
       <button
-        class="button launcher-load-btn"
+        class="btn w-full py-3 px-6 text-base font-semibold"
         id="load-button"
         disabled={isLoading}
         aria-label="Load selected model"
@@ -115,7 +115,7 @@
 
       {#if cachedModelIds.has(selectedModelId) && !isLoading}
         <button
-          class="button button-secondary"
+          class="btn btn-secondary"
           id="clear-button"
           aria-label="Clear cached model"
           onclick={handleClearCache}
@@ -126,99 +126,3 @@
     </div>
   </div>
 </div>
-
-<style>
-  .launcher-screen {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100%;
-    padding: var(--spacing-xl) var(--spacing-lg);
-  }
-
-  .launcher-card {
-    width: 100%;
-    max-width: 480px;
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
-  }
-
-  .launcher-hero {
-    text-align: center;
-    padding-bottom: var(--spacing-sm);
-  }
-
-  .launcher-logo {
-    font-size: 3rem;
-    line-height: 1;
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .launcher-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--color-text);
-    margin: 0 0 var(--spacing-xs) 0;
-  }
-
-  .launcher-subtitle {
-    font-size: var(--font-size-base);
-    color: var(--color-text-secondary);
-    margin: 0;
-  }
-
-  .launcher-storage {
-    text-align: center;
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    opacity: 0.8;
-    margin-top: calc(-1 * var(--spacing-md));
-  }
-
-  .launcher-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-  }
-
-  .launcher-load-btn {
-    width: 100%;
-    padding: var(--spacing-md) var(--spacing-lg);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-  }
-
-  /* Global button styles */
-  :global(.button) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-base);
-    font-weight: 500;
-    font-family: inherit;
-    line-height: 1.5;
-    color: white;
-    background-color: var(--color-primary);
-    border: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background-color 0.15s ease, transform 0.1s ease;
-  }
-
-  :global(.button:hover) { background-color: #4338ca; }
-  :global(.button:active) { transform: scale(0.98); }
-  :global(.button:disabled) {
-    background-color: var(--color-text-secondary);
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
-  :global(.button-secondary) {
-    background-color: var(--color-surface);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-  }
-  :global(.button-secondary:hover) { background-color: var(--color-border); }
-</style>

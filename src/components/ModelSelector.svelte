@@ -81,12 +81,14 @@
   );
 </script>
 
-<div id="model-selector-container" class="launcher-selector">
-  <label for="model-select" class="launcher-select-label">Choose a model</label>
+<div id="model-selector-container" class="flex flex-col gap-2">
+  <label for="model-select" class="font-semibold text-gray-900 dark:text-slate-100 text-sm uppercase tracking-wider">
+    Choose a model
+  </label>
 
   <select
     id="model-select"
-    class="launcher-select"
+    class="w-full px-3 py-2 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer appearance-auto transition-[border-color] duration-150 focus:outline-none focus:border-indigo-600 dark:focus:border-indigo-400 hover:border-indigo-600 dark:hover:border-indigo-400"
     aria-label="Select AI model"
     value={selectedModelId}
     onchange={handleChange}
@@ -113,162 +115,52 @@
   </select>
 
   <!-- Detail panel -->
-  <div class="launcher-detail-panel" aria-live="polite">
+  <div
+    class="min-h-[80px] p-4 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm"
+    aria-live="polite"
+  >
     {#if !selectedInfo}
-      <p class="launcher-detail-placeholder">Select a model to see details.</p>
+      <p class="text-gray-500 dark:text-slate-400 text-center m-0 py-2">Select a model to see details.</p>
     {:else}
-      <div class="launcher-detail-content">
-        <div class="launcher-detail-row">
-          <span class="launcher-detail-label">Download size</span>
-          <span class="launcher-detail-value">{sizeStr}</span>
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between items-center gap-2">
+          <span class="text-gray-500 dark:text-slate-400 flex-shrink-0">Download size</span>
+          <span class="text-gray-900 dark:text-slate-100 font-medium text-right">{sizeStr}</span>
         </div>
-        <div class="launcher-detail-row">
-          <span class="launcher-detail-label">VRAM needed</span>
-          <span class="launcher-detail-value">{vramStr}</span>
+        <div class="flex justify-between items-center gap-2">
+          <span class="text-gray-500 dark:text-slate-400 flex-shrink-0">VRAM needed</span>
+          <span class="text-gray-900 dark:text-slate-100 font-medium text-right">{vramStr}</span>
         </div>
-        <div class="launcher-detail-row">
-          <span class="launcher-detail-label">Context window</span>
-          <span class="launcher-detail-value">{ctxStr}</span>
+        <div class="flex justify-between items-center gap-2">
+          <span class="text-gray-500 dark:text-slate-400 flex-shrink-0">Context window</span>
+          <span class="text-gray-900 dark:text-slate-100 font-medium text-right">{ctxStr}</span>
         </div>
-        <div class="launcher-detail-row">
-          <span class="launcher-detail-label">Runtime</span>
-          <span class="launcher-detail-value">{runtimeStr}</span>
+        <div class="flex justify-between items-center gap-2">
+          <span class="text-gray-500 dark:text-slate-400 flex-shrink-0">Runtime</span>
+          <span class="text-gray-900 dark:text-slate-100 font-medium text-right">{runtimeStr}</span>
         </div>
         {#if selectedInfo.tags && selectedInfo.tags.length > 0}
-          <div class="launcher-detail-row">
-            <span class="launcher-detail-label">Tags</span>
-            <span class="launcher-detail-value">
+          <div class="flex justify-between items-center gap-2">
+            <span class="text-gray-500 dark:text-slate-400 flex-shrink-0">Tags</span>
+            <span class="text-gray-900 dark:text-slate-100 font-medium text-right flex items-center gap-1 flex-wrap justify-end">
               {#each selectedInfo.tags as tag (tag)}
-                <span class="launcher-tag">{tag}</span>
+                <span class="inline-block px-2 py-0.5 bg-indigo-600 text-white rounded-full text-[11px] font-semibold">{tag}</span>
               {/each}
             </span>
           </div>
         {/if}
         {#if familyDesc}
-          <div class="launcher-detail-row">
-            <span class="launcher-detail-label">Family</span>
-            <span class="launcher-detail-value launcher-family-desc">{familyDesc}</span>
+          <div class="flex justify-between items-center gap-2">
+            <span class="text-gray-500 dark:text-slate-400 flex-shrink-0">Family</span>
+            <span class="italic font-normal text-gray-500 dark:text-slate-400 text-right">{familyDesc}</span>
           </div>
         {/if}
         {#if isCached}
-          <div class="launcher-cached-row">
-            <span class="launcher-cached-badge">✓ Cached locally</span>
+          <div class="mt-1">
+            <span class="inline-block px-2.5 py-[3px] bg-green-500 text-white rounded-full text-[11px] font-semibold">✓ Cached locally</span>
           </div>
         {/if}
       </div>
     {/if}
   </div>
 </div>
-
-<style>
-  .launcher-selector {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-  }
-
-  .launcher-select-label {
-    font-weight: 600;
-    color: var(--color-text);
-    font-size: var(--font-size-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .launcher-select {
-    width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-base);
-    color: var(--color-text);
-    background-color: var(--color-surface);
-    border: 2px solid var(--color-border);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    appearance: auto;
-    transition: border-color 0.15s ease;
-  }
-
-  .launcher-select:focus {
-    outline: none;
-    border-color: var(--color-primary);
-  }
-
-  .launcher-select:hover {
-    border-color: var(--color-primary);
-  }
-
-  .launcher-detail-panel {
-    min-height: 80px;
-    padding: var(--spacing-md);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    font-size: var(--font-size-sm);
-  }
-
-  .launcher-detail-placeholder {
-    color: var(--color-text-secondary);
-    text-align: center;
-    margin: 0;
-    padding: var(--spacing-sm) 0;
-  }
-
-  .launcher-detail-content {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-  }
-
-  .launcher-detail-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--spacing-sm);
-  }
-
-  .launcher-detail-label {
-    color: var(--color-text-secondary);
-    flex-shrink: 0;
-  }
-
-  .launcher-detail-value {
-    color: var(--color-text);
-    font-weight: 500;
-    text-align: right;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .launcher-family-desc {
-    font-style: italic;
-    font-weight: 400;
-    color: var(--color-text-secondary);
-  }
-
-  .launcher-tag {
-    display: inline-block;
-    padding: 2px 8px;
-    background-color: var(--color-primary);
-    color: white;
-    border-radius: 99px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .launcher-cached-row {
-    margin-top: var(--spacing-xs);
-  }
-
-  .launcher-cached-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    background-color: var(--color-success);
-    color: white;
-    border-radius: 99px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-</style>
