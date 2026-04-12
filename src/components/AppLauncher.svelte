@@ -22,11 +22,20 @@
       description: 'Local AI conversation — private & fast',
       disabled: false,
     },
+    {
+      id: 'formatter',
+      icon: '📝',
+      name: 'Formatter',
+      description: 'Format and extract content from large documents',
+      disabled: false,
+    },
   ] as const;
 
   function handleAppClick(appId: string): void {
     if (appId === 'chat') {
       setScreen('launcher');
+    } else if (appId === 'formatter') {
+      setScreen('formatter');
     }
   }
 </script>
@@ -34,24 +43,33 @@
 <div class="flex items-center justify-center min-h-full px-6 py-12">
   <div class="w-full max-w-[600px]">
 
-    <!-- Hero section -->
-    <div class="text-center mb-10">
-      <div class="text-6xl leading-none mb-4 select-none" aria-hidden="true">🧠</div>
-      <h1 class="text-4xl font-bold text-gray-900 dark:text-slate-100 mb-2">WebLM</h1>
-      <p class="text-lg text-gray-500 dark:text-slate-400">
-        Run AI models locally in your browser
-      </p>
+    <!-- Hero section with gradient background -->
+    <div class="relative mb-10 py-10">
+      <!-- Subtle gradient backdrop -->
+      <div class="absolute inset-0 -z-10 rounded-2xl bg-gradient-to-b from-indigo-50/50 to-transparent dark:from-indigo-950/20 dark:to-transparent" aria-hidden="true"></div>
+      
+      <div class="text-center">
+        <div class="text-6xl leading-none mb-4 select-none" aria-hidden="true">🧠</div>
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-slate-100 mb-2">WebLM</h1>
+        <p class="text-lg text-gray-500 dark:text-slate-400">
+          Run AI models locally in your browser
+        </p>
+      </div>
     </div>
 
     <!-- App cards -->
     <div class="flex flex-col gap-4">
       {#each apps as app (app.id)}
         <Card.Root
-          class="p-5 transition-all duration-150 cursor-pointer select-none
-            hover:bg-gray-50 dark:hover:bg-slate-800/80
+          class="p-5 transition-all duration-200 ease-out cursor-pointer select-none
+            bg-white dark:bg-slate-800/50
+            border-gray-200 dark:border-slate-700
+            hover:bg-gray-50 dark:hover:bg-slate-800
             hover:border-indigo-300 dark:hover:border-indigo-600
-            active:scale-[0.99]
-            {app.disabled ? 'opacity-50 cursor-not-allowed' : ''}"
+            hover:scale-[1.02] hover:shadow-lg
+            active:scale-[0.98]
+            focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2
+            {app.disabled ? 'opacity-50 cursor-not-allowed hover:scale-100 hover:shadow-sm' : ''}"
           role="button"
           tabindex={app.disabled ? -1 : 0}
           aria-disabled={app.disabled}

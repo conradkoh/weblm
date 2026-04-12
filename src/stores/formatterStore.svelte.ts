@@ -1,0 +1,351 @@
+/**
+ * Formatter store — content formatting and extraction state.
+ *
+ * Manages the source content, desired format instructions,
+ * output results, and processing state for the Formatter mini app.
+ * Includes source refinement (Phase 2) and extraction (Phase 3).
+ */
+
+import type { FormatterState, RefinementState, ExtractionState, ExtractionResult } from './types';
+import { parseIntoChunks } from '../lib/formatter/chunker';
+import { formatChunksToMarkdown } from '../lib/formatter/markdownFormatter';
+import { analyzeAllCohesions, type CohesionAnalysis } from '../lib/formatter/cohesionAnalyzer';
+import { refineChunks, type RefinementResult } from '../lib/formatter/refiner';
+import { getModelInfo } from '../config';
+import { estimateTokenCount } from '../lib/formatter/tokenizer';
+import { processChunks, type ExtractionProgress } from '../lib/formatter/extractionEngine';
+import { logger } from '../logger';
+
+// ─── State ────────────────────────────────────────────────────
+
+const _state = $state<FormatterState>({
+  sourceContent: '',
+  desiredFormat: '',
+  outputResults: [],
+  isProcessing: false,
+  currentPhase: null,
+  selectedModelId: null,
+  refinementState: 'idle',
+  refinedChunks: [],
+  errorMessage: null,
+  extractionState: 'idle',
+  extractionResults: [],
+  showAllResults: false,
+});
+
+// ─── Getters ──────────────────────────────────────────────────
+
+/** Returns the reactive formatter state. */
+export function getFormatterState(): FormatterState {
+  return _state;
+}
+
+// ─── Mutations ────────────────────────────────────────────────
+
+export function setSourceContent(content: string): void {
+  _state.sourceContent = content;
+  saveToLocalStorage();
+}
+
+export function setDesiredFormat(format: string): void {
+  _state.desiredFormat = format;
+  saveToLocalStorage();
+}
+
+export function setSelectedModelId(modelId: string | null): void {
+  _state.selectedModelId = modelId;
+  saveToLocalStorage();
+}
+
+export function addOutputResult(result: string): void {
+  _state.outputResults = [..._state.outputResults, result];
+}
+
+export function clearOutputResults(): void {
+  _state.outputResults = [];
+}
+
+export function setOutputResults(results: string[]): void {
+  _state.outputResults = results;
+}
+
+export function setProcessing(processing: boolean): void {
+  _state.isProcessing = processing;
+}
+
+export function setCurrentPhase(phase: string | null): void {
+  _state.currentPhase = phase;
+}
+
+export function setRefinementState(state: RefinementState): void {
+  _state.refinementState = state;
+}
+
+export function setRefinedChunks(chunks: string[]): void {
+  _state.refinedChunks = chunks;
+}
+
+export function setErrorMessage(message: string | null): void {
+  _state.errorMessage = message;
+}
+
+// Extraction mutations
+export function setExtractionState(state: ExtractionState): void {
+  _state.extractionState = state;
+}
+
+export function setExtractionResults(results: ExtractionResult[]): void {
+  _state.extractionResults = results;
+}
+
+export function setShowAllResults(show: boolean): void {
+  _state.showAllResults = show;
+}
+
+// ─── Refinement Pipeline ──────────────────────────────────────
+
+/**
+ * Run the complete refinement pipeline on the source content.
+ * Phase 1: Source Refinement
+ */
+export async function runRefinement(): Promise<void> {
+  const { sourceContent } = _state;
+
+  if (!sourceContent.trim()) {
+    setErrorMessage('Source content is empty');
+    setRefinementState('error');
+    return;
+  }
+
+  _state.isProcessing = true;
+  _state.errorMessage = null;
+  _state.refinedChunks = [];
+
+  try {
+    // Step 1: Parse into chunks using model's context window
+    setRefinementState('chunking');
+    setCurrentPhase('Parsing source into chunks...');
+    logger.info('Refinement: Starting chunking');
+    
+    // Use static 800 token chunk size
+    const chunkSize = 800;
+    
+    const chunks: string[] = parseIntoChunks(sourceContent, { chunkSize });
+    
+    if (chunks.length === 0) {
+      throw new Error('No content to process');
+    }
+    
+    logger.info(`Refinement: Created ${chunks.length} chunks`);
+
+    // Step 2: Format each chunk to markdown
+    setRefinementState('formatting');
+    setCurrentPhase(`Formatting ${chunks.length} chunks to markdown...`);
+    logger.info('Refinement: Starting markdown formatting');
+    
+    const formattedChunks = await formatChunksToMarkdown(chunks, {
+      temperature: 0.3,
+      maxTokens: 2048,
+      concurrency: 1, // Sequential to avoid WebLLM "Already generating" conflicts
+    });
+    
+    logger.info(`Refinement: Formatted ${formattedChunks.length} chunks`);
+
+    // Step 3: Analyze cohesion between consecutive chunks
+    setRefinementState('analyzing');
+    setCurrentPhase('Analyzing chunk cohesion...');
+    logger.info('Refinement: Starting cohesion analysis');
+    
+    const analyses: CohesionAnalysis[] = await analyzeAllCohesions(formattedChunks);
+    
+    const issuesFound = analyses.filter(a => a.hasIssues).length;
+    logger.info(`Refinement: Analyzed cohesion, found ${issuesFound} pairs with issues`);
+
+    // Step 4: Refine chunks based on cohesion analysis
+    setRefinementState('refining');
+    setCurrentPhase('Refining chunks based on analysis...');
+    logger.info('Refinement: Starting chunk refinement');
+    
+    const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses);
+    
+    if (refinementResult.success) {
+      // Validate chunk sizes (800 tokens max, ~3200 chars)
+      const validChunks = refinementResult.refinedChunks.filter(c => {
+        return estimateTokenCount(c) <= 800;
+      });
+      
+      _state.refinedChunks = validChunks;
+      setRefinementState('complete');
+      setCurrentPhase(`Refinement complete: ${validChunks.length} refined chunks`);
+      logger.info(`Refinement: Complete with ${validChunks.length} refined chunks`);
+    } else {
+      // Fall back to formatted chunks if refinement failed
+      _state.refinedChunks = formattedChunks;
+      setRefinementState('complete');
+      setCurrentPhase(`Formatting complete (${formattedChunks.length} chunks)`);
+      logger.warn('Refinement: Refinement failed, using formatted chunks instead');
+    }
+
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    logger.error('Refinement error:', err);
+    setErrorMessage(errorMsg);
+    setRefinementState('error');
+    setCurrentPhase(`Error: ${errorMsg}`);
+  } finally {
+    _state.isProcessing = false;
+  }
+}
+
+/**
+ * Reset the refinement state.
+ */
+export function resetRefinement(): void {
+  _state.refinementState = 'idle';
+  _state.refinedChunks = [];
+  _state.errorMessage = null;
+  _state.currentPhase = null;
+}
+
+// ─── Extraction Pipeline ──────────────────────────────────────
+
+/**
+ * Run the extraction pipeline on refined chunks.
+ * Phase 3: Content Extraction
+ */
+export async function runExtraction(): Promise<void> {
+  const { refinedChunks, desiredFormat } = _state;
+
+  if (refinedChunks.length === 0) {
+    setErrorMessage('No refined chunks available. Run refinement first.');
+    setExtractionState('error');
+    return;
+  }
+
+  if (!desiredFormat.trim()) {
+    setErrorMessage('Desired format is required for extraction');
+    setExtractionState('error');
+    return;
+  }
+
+  _state.isProcessing = true;
+  _state.errorMessage = null;
+  _state.extractionResults = [];
+
+  try {
+    setExtractionState('parsing');
+    setCurrentPhase('Parsing refined chunks...');
+    logger.info('Extraction: Starting');
+
+    const results = await processChunks(
+      refinedChunks,
+      desiredFormat,
+      { concurrency: 1 }, // Sequential to avoid WebLLM conflicts
+      (progress: ExtractionProgress) => {
+        setCurrentPhase(progress.message);
+        if (progress.phase === 'extracting') {
+          setExtractionState('extracting');
+        }
+      }
+    );
+
+    _state.extractionResults = results;
+    setExtractionState('complete');
+    setCurrentPhase(`Extraction complete: ${results.length} relevant results`);
+    logger.info(`Extraction: Complete with ${results.length} results`);
+
+    // Update output results with extraction content
+    const outputContent = results
+      .filter(r => r.relevance !== 'none' && r.content !== '<NOT RELEVANT>')
+      .map(r => r.title ? `## ${r.title}\n\n${r.content}` : r.content);
+    
+    setOutputResults(outputContent);
+
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    logger.error('Extraction error:', err);
+    setErrorMessage(errorMsg);
+    setExtractionState('error');
+    setCurrentPhase(`Error: ${errorMsg}`);
+  } finally {
+    _state.isProcessing = false;
+  }
+}
+
+/**
+ * Reset the extraction state.
+ */
+export function resetExtraction(): void {
+  _state.extractionState = 'idle';
+  _state.extractionResults = [];
+  _state.showAllResults = false;
+}
+
+/**
+ * Toggle showing all results (including not relevant).
+ */
+export function toggleShowAllResults(): void {
+  _state.showAllResults = !_state.showAllResults;
+}
+
+// ─── Local Storage Persistence ────────────────────────────────
+
+const STORAGE_KEY = 'weblm-formatter';
+
+interface StoredData {
+  sourceContent: string;
+  desiredFormat: string;
+  selectedModelId: string | null;
+}
+
+function saveToLocalStorage(): void {
+  try {
+    const data: StoredData = {
+      sourceContent: _state.sourceContent,
+      desiredFormat: _state.desiredFormat,
+      selectedModelId: _state.selectedModelId,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    logger.error('failed to save formatter state to localStorage:', err);
+  }
+}
+
+export function loadFromLocalStorage(): void {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const data: StoredData = JSON.parse(stored);
+      _state.sourceContent = data.sourceContent ?? '';
+      _state.desiredFormat = data.desiredFormat ?? '';
+      _state.selectedModelId = data.selectedModelId ?? null;
+      logger.debug('loaded formatter state from localStorage');
+    }
+  } catch (err) {
+    logger.error('failed to load formatter state from localStorage:', err);
+  }
+}
+
+export function clearLocalStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    logger.error('failed to clear formatter state from localStorage:', err);
+  }
+}
+
+export function resetFormatterState(): void {
+  _state.sourceContent = '';
+  _state.desiredFormat = '';
+  _state.selectedModelId = null;
+  _state.outputResults = [];
+  _state.isProcessing = false;
+  _state.currentPhase = null;
+  _state.refinementState = 'idle';
+  _state.refinedChunks = [];
+  _state.errorMessage = null;
+  _state.extractionState = 'idle';
+  _state.extractionResults = [];
+  _state.showAllResults = false;
+  clearLocalStorage();
+}

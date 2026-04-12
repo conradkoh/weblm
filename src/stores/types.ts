@@ -13,7 +13,7 @@ export type { ChatMessage, ModelProgress, Theme };
 
 // ─── App ──────────────────────────────────────────────────────
 
-export type Screen = 'launcher-home' | 'launcher' | 'chat';
+export type Screen = 'launcher-home' | 'launcher' | 'chat' | 'formatter';
 
 export interface WebGPUState {
   available: boolean | null;
@@ -72,4 +72,39 @@ export interface SettingsState {
   systemPrompt: string;
   theme: Theme;
   showMetrics: boolean;
+}
+
+// ─── Formatter ─────────────────────────────────────────────────
+
+export type RefinementState = 'idle' | 'chunking' | 'formatting' | 'analyzing' | 'refining' | 'complete' | 'error';
+
+export type ExtractionState = 'idle' | 'parsing' | 'extracting' | 'complete' | 'error';
+
+export type RelevanceLevel = 'high' | 'medium' | 'low' | 'none';
+
+export interface ExtractionResult {
+  chunkId: number;
+  nodeId?: string;
+  title?: string;
+  content: string;
+  relevance: RelevanceLevel;
+  reasoning: string;
+}
+
+export interface FormatterState {
+  sourceContent: string;
+  desiredFormat: string;
+  outputResults: string[];
+  isProcessing: boolean;
+  currentPhase: string | null;
+  // Model selection
+  selectedModelId: string | null;
+  // Refinement-related state
+  refinementState: RefinementState;
+  refinedChunks: string[];
+  errorMessage: string | null;
+  // Extraction-related state
+  extractionState: ExtractionState;
+  extractionResults: ExtractionResult[];
+  showAllResults: boolean;
 }

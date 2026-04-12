@@ -20,6 +20,7 @@
     clearUploadedFile,
   } from '../stores/chatStore.svelte';
   import { getEngineState } from '../stores/engineStore.svelte';
+  import { setScreen } from '../stores/appStore.svelte';
   import { Button } from '$ui/button';
   import { Separator } from '$ui/separator';
 
@@ -62,7 +63,18 @@
 <div class="flex-1 flex flex-col w-full max-w-[800px] mx-auto h-full overflow-hidden">
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-slate-800 flex-shrink-0">
-    <span class="font-semibold text-gray-900 dark:text-slate-100 text-sm">{modelDisplayName}</span>
+    <div class="flex items-center gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        title="Go to apps"
+        aria-label="Go back to app launcher"
+        onclick={() => { setScreen('launcher-home'); }}
+      >
+        🏠
+      </Button>
+      <span class="font-semibold text-gray-900 dark:text-slate-100 text-sm">{modelDisplayName}</span>
+    </div>
     <div class="flex items-center gap-2">
       <Button
         variant="outline"

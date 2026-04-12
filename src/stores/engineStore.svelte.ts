@@ -118,8 +118,15 @@ export async function getStorageInfo(): Promise<string> {
 /**
  * Load a model by ID. Updates progress reactively during loading.
  * Returns true on success, false on failure.
+ * 
+ * @param modelId - The model ID to load
+ * @param options - Optional configuration
+ * @param options.skipScreenTransition - If true, don't transition to chat screen after loading
  */
-export async function loadModel(modelId: string): Promise<boolean> {
+export async function loadModel(
+  modelId: string, 
+  options?: { skipScreenTransition?: boolean }
+): Promise<boolean> {
   const modelInfo = getModelInfo(modelId);
   const displayName = modelInfo?.displayName ?? modelId;
 
@@ -142,8 +149,10 @@ export async function loadModel(modelId: string): Promise<boolean> {
       updateProgress(progress);
     });
     setModelReady(modelId, displayName);
-    // Notify app store: transition to chat screen
-    setScreen('chat');
+    // Notify app store: transition to chat screen (unless skipped)
+    if (!options?.skipScreenTransition) {
+      setScreen('chat');
+    }
     logger.info(`Model ${modelId} loaded successfully`);
     return true;
   } catch (error) {

@@ -9,3 +9,4 @@ export * from './appStore.svelte';
 export * from './engineStore.svelte';
 export * from './chatStore.svelte';
 export * from './settingsStore.svelte';
+export * from './formatterStore.svelte';

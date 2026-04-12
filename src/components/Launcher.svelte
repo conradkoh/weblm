@@ -15,6 +15,7 @@
     getStorageInfo,
   } from '../stores/engineStore.svelte';
   import { DEFAULT_MODEL_ID } from '../config';
+  import { setScreen } from '../stores/appStore.svelte';
   import { Button } from '$ui/button';
   import * as Card from '$ui/card';
 
@@ -77,6 +78,21 @@
   <div class="w-full max-w-[480px]">
     <Card.Root class="flex flex-col gap-6 p-6">
       <Card.Content class="p-0 flex flex-col gap-6">
+        <!-- Header with back button -->
+        <div class="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Back to apps"
+            aria-label="Go back to app launcher"
+            onclick={() => { setScreen('launcher-home'); }}
+          >
+            ← Back
+          </Button>
+          <span class="font-semibold text-gray-900 dark:text-slate-100 text-sm">Select Model</span>
+          <div class="w-[60px]"></div>
+        </div>
+
         <!-- Hero -->
         <div class="text-center pb-2">
           <div class="text-5xl leading-none mb-2">🧠</div>
