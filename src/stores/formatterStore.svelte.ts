@@ -105,20 +105,12 @@ export function setSelectedModelId(modelId: string | null): void {
   saveToLocalStorage();
 }
 
-export function addOutputResult(result: string): void {
-  _state.outputResults = [..._state.outputResults, result];
-}
-
 export function clearOutputResults(): void {
   _state.outputResults = [];
 }
 
 export function setOutputResults(results: string[]): void {
   _state.outputResults = results;
-}
-
-export function setProcessing(processing: boolean): void {
-  _state.isProcessing = processing;
 }
 
 export function setCurrentPhase(phase: string | null): void {
@@ -140,14 +132,6 @@ export function setErrorMessage(message: string | null): void {
 // Extraction mutations
 export function setExtractionState(state: ExtractionState): void {
   _state.extractionState = state;
-}
-
-export function setExtractionResults(results: ExtractionResult[]): void {
-  _state.extractionResults = results;
-}
-
-export function setShowAllResults(show: boolean): void {
-  _state.showAllResults = show;
 }
 
 // Worker Pool configuration setters (Experimental)
@@ -368,10 +352,6 @@ export async function retryChunk(index: number): Promise<void> {
       _state.refinementState = 'complete';
     }
   }
-}
-
-export function addPartialExtractionResult(result: ExtractionResult): void {
-  _state.partialExtractionResults = [..._state.partialExtractionResults, result];
 }
 
 /**
@@ -639,23 +619,6 @@ export function setChunkRefined(index: number): void {
 /**
  * Mark a chunk as having an error.
  */
-export function setChunkError(index: number, error: string): void {
-  const chunks = _state.pipelineData.chunks;
-  if (index >= 0 && index < chunks.length) {
-    const existing = chunks[index]!;
-    const chunk: ChunkPipelineData = {
-      ...existing,
-      status: 'error',
-      error,
-    };
-    _state.pipelineData.chunks = [
-      ...chunks.slice(0, index),
-      chunk,
-      ...chunks.slice(index + 1),
-    ];
-  }
-}
-
 /**
  * Select a chunk for inspection in the pipeline detail panel.
  */
@@ -732,11 +695,6 @@ export function pruneChunkCache(newChunkCount: number): void {
 /**
  * Clear all chunk cache entries.
  */
-export function clearChunkCache(): void {
-  _state.chunkCache = {};
-  logger.debug('ChunkCache: cleared all entries');
-}
-
 /**
  * Get cache statistics for logging.
  */
@@ -818,12 +776,6 @@ export function computeContentHash(content: string, contentLength?: number): str
  * Check if content matches stored hash (with length verification).
  * More reliable than hash-only check due to collision protection.
  */
-export function isContentCached(content: string, storedHash: string | null, storedLength: number | null): boolean {
-  if (!storedHash || !storedLength) return false;
-  if (content.length !== storedLength) return false;
-  return computeContentHash(content, content.length) === storedHash;
-}
-
 /**
  * Get the appropriate formatter backend based on current settings.
  * Priority: Worker Pool > Local

@@ -799,7 +799,7 @@
                 {content}
                 {index}
                 {status}
-                streamingText={status === 'streaming' ? formatterState.streamingText : ''}
+                streamingText={status === 'streaming' ? formatterState.activeChunkStreamingText : ''}
                 onRetry={() => retryChunk(index)}
               />
             {/each}
