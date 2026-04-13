@@ -74,17 +74,14 @@
     <div class="flex items-center gap-1.5">
       {#each phases as phase}
         <div 
-          class="h-1.5 rounded-full transition-all duration-300"
+          class="h-1.5 rounded-full transition-all duration-300 flex-1"
           class:bg-green-500={phase.status === 'completed'}
           class:bg-indigo-500={phase.status === 'active'}
           class:bg-gray-300={phase.status === 'pending'}
           class:dark:bg-green-400={phase.status === 'completed'}
           class:dark:bg-indigo-400={phase.status === 'active'}
           class:dark:bg-slate-600={phase.status === 'pending'}
-          class:flex-1={phase.status === 'active'}
-          class:w-1.5={phase.status !== 'active'}
           class:animate-pulse={phase.status === 'active'}
-          style={phase.status === 'active' ? 'flex: 1' : ''}
         ></div>
       {/each}
     </div>

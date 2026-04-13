@@ -63,23 +63,3 @@ export function useAutoScroll(getContainer: () => HTMLElement | null): AutoScrol
   };
 }
 
-/**
- * Debounced scroll handler factory.
- * Helps avoid excessive state updates during scrolling.
- */
-export function createDebouncedScrollHandler(
-  handler: (e: Event) => void,
-  delay: number = 50
-): (e: Event) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  
-  return (e: Event) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      handler(e);
-      timeoutId = null;
-    }, delay);
-  };
-}

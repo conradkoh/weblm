@@ -17,7 +17,7 @@
   const dotSizeClass = $derived(size === 'sm' ? 'w-3 h-3' : 'w-4 h-4');
 
   // Get status configuration
-  const statusConfig = $derived(() => {
+  const statusConfig = $derived.by(() => {
     switch (status) {
       case 'pending':
         return {
@@ -90,9 +90,9 @@
 </script>
 
 <span 
-  class="inline-flex items-center justify-center rounded-full {dotSizeClass} {statusConfig().bgColor} {statusConfig().color} {sizeClass} font-bold"
-  class:animate-pulse={statusConfig().pulse}
-  title={statusConfig().label}
+  class="inline-flex items-center justify-center rounded-full {dotSizeClass} {statusConfig.bgColor} {statusConfig.color} {sizeClass} font-bold"
+  class:animate-pulse={statusConfig.pulse}
+  title={statusConfig.label}
 >
-  {statusConfig().icon}
+  {statusConfig.icon}
 </span>

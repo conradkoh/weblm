@@ -42,7 +42,7 @@
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
   import { renderMarkdown } from '../lib/markdown';
-  import { useAutoScroll } from '../lib/hooks/useAutoScroll';
+  import { useAutoScroll } from '../lib/hooks/useAutoScroll.svelte';
   import { TEST_SOURCE_CONTENT, TEST_DESIRED_FORMAT } from '../lib/formatter/testData';
   import type { ExtractionResult } from '../stores/types';
 

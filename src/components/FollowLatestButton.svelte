@@ -17,7 +17,7 @@
   <button
     type="button"
     onclick={onclick}
-    class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 text-xs rounded-full 
+    class="absolute bottom-3 left-1/2 z-10 px-3 py-1.5 text-xs rounded-full 
            bg-slate-700/90 dark:bg-slate-600/90 text-white shadow-lg
            hover:bg-slate-600 dark:hover:bg-slate-500 transition-all duration-200
            flex items-center gap-1.5 backdrop-blur-sm"

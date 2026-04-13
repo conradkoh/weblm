@@ -311,7 +311,6 @@ export async function retryChunk(index: number): Promise<void> {
   
   // Set processing state
   _state.isProcessing = true;
-  _state.refinementState = 'formatting';
   setActiveStreamingChunk(index);
   setActiveProcessingChunkIndex(index);
   clearActiveChunkStreaming();
@@ -346,8 +345,9 @@ export async function retryChunk(index: number): Promise<void> {
     
     // Update chunk cache for future resume
     const cacheKey = index;
+    const hash = computeContentHash(rawText, rawText.length);
     _state.chunkCache[cacheKey] = {
-      hash: '', // Will be computed on next run
+      hash,
       refinedText: formattedText,
       refinedAt: Date.now(),
     };
@@ -356,7 +356,6 @@ export async function retryChunk(index: number): Promise<void> {
   } catch (error) {
     logger.error(`RetryChunk: failed for chunk ${index}`, error);
     _state.errorMessage = `Retry failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    _state.refinementState = 'error';
   } finally {
     // Clear active streaming state
     _state.activeStreamingChunkIndex = null;

@@ -85,7 +85,7 @@
       <div class="flex items-center gap-1 shrink-0" title="Status: {chunk.status}">
         <!-- Formatting status -->
         <ChunkProgressIndicator 
-          status={index === 0 && (chunk.status === 'formatting' || chunk.status === 'formatted') ? chunk.status : 'pending'}
+          status={['formatting', 'formatted'].includes(chunk.status) ? chunk.status : 'pending'}
           size="sm"
         />
         <!-- Analysis status -->
