@@ -268,3 +268,49 @@ export interface FormatterState {
   renderedReport: string | null;                   // Final template output
   structuredExtractionState: StructuredExtractionState;  // Structured extraction progress
 }
+
+// ─── Job Queue ─────────────────────────────────────────────────
+
+/**
+ * Types of LLM jobs that can be queued.
+ */
+export type JobType = 'refine' | 'extract' | 'schema' | 'structured-extract';
+
+/**
+ * Status of a job in the queue.
+ */
+export type JobStatus = 'pending' | 'processing' | 'completed' | 'error';
+
+/**
+ * Input for a job.
+ */
+export interface JobInput {
+  messages: ChatMessage[];
+  options?: Record<string, unknown>;
+}
+
+/**
+ * A single job in the queue.
+ */
+export interface Job {
+  id: string;
+  type: JobType;
+  status: JobStatus;
+  input: JobInput;
+  output: string | null;
+  error: string | null;
+  createdAt: number;
+  completedAt: number | null;
+  streamingText: string;
+}
+
+/**
+ * Queue state for the job queue.
+ */
+export interface JobQueueState {
+  jobs: Job[];
+  currentJobId: string | null;
+  isProcessing: boolean;
+  totalProcessed: number;
+  totalPending: number;
+}
