@@ -70,6 +70,9 @@ const _state = $state<FormatterState>({
   },
   // Incremental chunk cache for resume functionality
   chunkCache: {},
+  // Per-chunk streaming state
+  activeStreamingChunkIndex: null,
+  activeChunkStreamingText: '',
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -605,6 +608,33 @@ export function getChunkCacheStats(): { entries: number; totalBytes: number } {
   return { entries, totalBytes };
 }
 
+// ─── Per-Chunk Streaming Functions ───────────────────────────────────
+
+/**
+ * Set the currently streaming chunk index.
+ * Called when a chunk starts streaming.
+ */
+export function setActiveStreamingChunk(index: number | null): void {
+  _state.activeStreamingChunkIndex = index;
+  if (index === null) {
+    _state.activeChunkStreamingText = '';
+  }
+}
+
+/**
+ * Append a token to the active chunk's streaming text.
+ */
+export function appendActiveChunkToken(token: string): void {
+  _state.activeChunkStreamingText += token;
+}
+
+/**
+ * Clear the active chunk streaming text.
+ */
+export function clearActiveChunkStreaming(): void {
+  _state.activeChunkStreamingText = '';
+}
+
 /**
  * Simple hash function for content change detection using djb2 algorithm.
  * 
@@ -753,8 +783,10 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
     
     // Clear and set up streaming for refinement pipeline
     clearStreamingText();
+    clearActiveChunkStreaming();
     const streamingCallback = (token: string) => {
       appendStreamingToken(token);
+      appendActiveChunkToken(token);
     };
     
     // Enhanced progress handler that updates chunk progress and task plan
@@ -798,12 +830,24 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       updateChunkFormatting(index, formattedChunk);
     };
     
+    // Per-chunk streaming callbacks
+    const onChunkStreamStart = (index: number) => {
+      setActiveStreamingChunk(index);
+      clearActiveChunkStreaming();
+    };
+    
+    const onChunkStreamEnd = (index: number) => {
+      setActiveStreamingChunk(null);
+    };
+    
     const { formattedChunks, analyses } = await processPipeline(
       chunks,
       backend,
       pipelineProgressHandler,
       streamingCallback,
-      onChunkComplete
+      onChunkComplete,
+      onChunkStreamStart,
+      onChunkStreamEnd
     );
     
     // Update pipeline data with analysis results

@@ -35,6 +35,8 @@ export interface PipelineResult {
  * @param onProgress - Optional callback for progress updates
  * @param onToken - Optional callback for streaming token feedback
  * @param onChunkComplete - Optional callback called after each chunk is formatted
+ * @param onChunkStreamStart - Optional callback when a chunk starts streaming
+ * @param onChunkStreamEnd - Optional callback when a chunk stops streaming
  * @returns Promise resolving to formatted chunks and cohesion analyses
  */
 export async function processPipeline(
@@ -42,7 +44,9 @@ export async function processPipeline(
   backend: FormatterBackend,
   onProgress?: (progress: PipelineProgress) => void | Promise<void>,
   onToken?: (token: string) => void,
-  onChunkComplete?: (chunk: string, index: number) => void
+  onChunkComplete?: (chunk: string, index: number) => void,
+  onChunkStreamStart?: (index: number) => void,
+  onChunkStreamEnd?: (index: number) => void
 ): Promise<PipelineResult> {
   if (chunks.length === 0) {
     return { formattedChunks: [], analyses: [] };
@@ -69,8 +73,11 @@ export async function processPipeline(
       
       const batchResults = await Promise.all(
         batch.map(async (chunk, batchIdx) => {
+          const index = i + batchIdx;
+          onChunkStreamStart?.(index);
           const formatted = await formatChunkToMarkdown(chunk, backend, { onToken });
-          return { index: i + batchIdx, formatted };
+          onChunkStreamEnd?.(index);
+          return { index, formatted };
         })
       );
       
@@ -145,7 +152,9 @@ export async function processPipeline(
     logger.info('Pipeline: Using sequential mode (interleaved)');
     
     // Format the first chunk
+    onChunkStreamStart?.(0);
     formattedChunks[0] = await formatChunkToMarkdown(chunks[0]!, backend, { onToken });
+    onChunkStreamEnd?.(0);
     formattedCount = 1;
     // Notify partial result
     onChunkComplete?.(formattedChunks[0]!, 0);
@@ -161,7 +170,9 @@ export async function processPipeline(
     // For each subsequent chunk: format it, then immediately analyze the pair
     for (let i = 1; i < chunks.length; i++) {
       // Format chunk[i]
+      onChunkStreamStart?.(i);
       formattedChunks[i] = await formatChunkToMarkdown(chunks[i]!, backend, { onToken });
+      onChunkStreamEnd?.(i);
       formattedCount++;
       // Notify partial result
       onChunkComplete?.(formattedChunks[i]!, i);

@@ -242,4 +242,7 @@ export interface FormatterState {
   pipelineData: PipelineObservability;
   // Incremental chunk cache for resume functionality
   chunkCache: ChunkCache;
+  // Per-chunk streaming state
+  activeStreamingChunkIndex: number | null;  // which chunk is currently streaming
+  activeChunkStreamingText: string;          // accumulated tokens for active chunk
 }
