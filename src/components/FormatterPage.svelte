@@ -569,34 +569,33 @@
           >
             📋 Test Data
           </Button>
-          {#if formatterState.refinedChunks.length > 0 && formatterState.refinementState === 'complete'}
-            <Button
-              variant="outline"
-              size="sm"
-              title="Re-process source with current content"
-              onclick={() => handleRefineSource(true)}
-            >
-              🔄 Re-process
-            </Button>
-          {/if}
+          <Button
+            variant="outline"
+            size="sm"
+            title={formatterState.refinedChunks.length > 0 && formatterState.refinementState === 'complete' ? 'Re-process source with current content' : 'Refine source first'}
+            disabled={formatterState.refinedChunks.length === 0 || formatterState.refinementState !== 'complete' || formatterState.isProcessing}
+            onclick={() => handleRefineSource(true)}
+          >
+            🔄 Re-process
+          </Button>
           <Button
             variant="default"
             size="sm"
+            title={!formatterState.sourceContent.trim() ? 'Add source content first' : isRefining || isExtracting ? 'Processing in progress' : 'Start refinement'}
             disabled={!formatterState.sourceContent.trim() || isRefining || isExtracting}
             onclick={() => handleRefineSource(false)}
           >
             {isRefining ? 'Refining...' : 'Refine Source'}
           </Button>
-          {#if formatterState.isProcessing}
-            <Button
-              variant="destructive"
-              size="sm"
-              title="Stop processing"
-              onclick={handleStop}
-            >
-              ⏹ Stop
-            </Button>
-          {/if}
+          <Button
+            variant="destructive"
+            size="sm"
+            title={formatterState.isProcessing ? 'Stop current processing' : 'No processing in progress'}
+            disabled={!formatterState.isProcessing}
+            onclick={handleStop}
+          >
+            ⏹ Stop
+          </Button>
         </div>
       </div>
       <!-- Source column content: textarea or ChunkList -->
@@ -639,23 +638,39 @@
         {#if formatterState.refinedChunks.length > 0}
           <div class="flex items-center gap-2">
             <!-- Generate Schema button -->
-            {#if formatterState.schemaGenerationState === 'idle' || formatterState.schemaGenerationState === 'error'}
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!formatterState.desiredFormat.trim() || formatterState.isProcessing}
-                onclick={generateSchema}
-              >
-                Generate Schema
-              </Button>
-            {:else if formatterState.schemaGenerationState === 'generating'}
-              <span class="text-xs text-gray-500 dark:text-slate-400">Generating schema...</span>
-            {/if}
+            <Button
+              variant="outline"
+              size="sm"
+              title={
+                formatterState.schemaGenerationState === 'generating' ? 'Generating schema...' :
+                !formatterState.desiredFormat.trim() ? 'Add desired format first' :
+                formatterState.isProcessing ? 'Wait for processing to complete' :
+                'Generate schema from desired format'
+              }
+              disabled={
+                formatterState.schemaGenerationState === 'generating' ||
+                !formatterState.desiredFormat.trim() ||
+                formatterState.isProcessing
+              }
+              onclick={generateSchema}
+            >
+              {formatterState.schemaGenerationState === 'generating' ? 'Generating...' : 'Generate Schema'}
+            </Button>
             <!-- Run Extraction button (structured) -->
             <Button
               variant="default"
               size="sm"
-              disabled={formatterState.isProcessing || !formatterState.desiredFormat.trim() || formatterState.refinedChunks.length === 0}
+              title={
+                !formatterState.extractionSchema ? 'Generate a schema first' :
+                formatterState.isProcessing ? 'Processing in progress' :
+                formatterState.refinedChunks.length === 0 ? 'Refine source first' :
+                'Run structured extraction'
+              }
+              disabled={
+                !formatterState.extractionSchema ||
+                formatterState.isProcessing ||
+                formatterState.refinedChunks.length === 0
+              }
               onclick={runStructuredExtraction}
             >
               {formatterState.isProcessing ? 'Processing...' : 'Run Structured Extraction'}
@@ -672,9 +687,9 @@
         disabled={isRefining || isExtracting}
       />
       
-      <!-- Schema display -->
-      {#if formatterState.extractionSchema && formatterState.schemaGenerationState === 'complete'}
-        <div class="mt-2 p-3 bg-gray-100 dark:bg-slate-700/50 rounded border border-gray-200 dark:border-slate-600">
+      <!-- Schema display (always visible) -->
+      <div class="mt-2 p-3 bg-gray-100 dark:bg-slate-700/50 rounded border border-gray-200 dark:border-slate-600">
+        {#if formatterState.extractionSchema && formatterState.schemaGenerationState === 'complete'}
           <div class="flex items-center justify-between mb-2">
             <span class="font-medium text-xs text-gray-700 dark:text-slate-300">
               Schema ({formatterState.extractionSchema.fields.length} fields)
@@ -682,6 +697,7 @@
             <Button
               variant="ghost"
               size="sm"
+              title="Clear schema"
               onclick={resetStructuredExtraction}
             >
               ✕
@@ -698,8 +714,12 @@
               </div>
             {/each}
           </div>
-        </div>
-      {/if}
+        {:else}
+          <span class="text-xs text-gray-500 dark:text-slate-400 italic">
+            No schema generated yet. Click 'Generate Schema' above.
+          </span>
+        {/if}
+      </div>
     </div>
 
     <!-- Output Column -->
@@ -734,40 +754,50 @@
           {/if}
         </div>
         <div class="flex items-center gap-1">
-          {#if formatterState.extractionResults.length > 0}
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Copy all relevant"
-              onclick={handleCopyAllRelevant}
-            >
-              📋 Copy All
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Download as markdown"
-              onclick={handleDownloadMarkdown}
-            >
-              ⬇️ Download
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              title={formatterState.showAllResults ? 'Hide not relevant' : 'Show all'}
-              onclick={handleToggleShowAll}
-            >
-              {formatterState.showAllResults ? '🔍 Hide N/A' : '🔍 Show All'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Clear results"
-              onclick={handleResetExtraction}
-            >
-              ✕
-            </Button>
-          {/if}
+          <Button
+            variant="ghost"
+            size="sm"
+            title={
+              formatterState.extractionResults.length > 0 ? 'Copy all relevant results' : 'No results to copy'
+            }
+            disabled={formatterState.extractionResults.length === 0}
+            onclick={handleCopyAllRelevant}
+          >
+            📋 Copy All
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            title={
+              formatterState.extractionResults.length > 0 ? 'Download as markdown' : 'No results to download'
+            }
+            disabled={formatterState.extractionResults.length === 0}
+            onclick={handleDownloadMarkdown}
+          >
+            ⬇️ Download
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            title={
+              formatterState.showAllResults ? 'Hide not relevant' : 'Show all'
+            }
+            disabled={formatterState.extractionResults.length === 0}
+            onclick={handleToggleShowAll}
+          >
+            {formatterState.showAllResults ? '🔍 Hide N/A' : '🔍 Show All'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            title={
+              formatterState.extractionResults.length > 0 ? 'Clear results' : 'No results to clear'
+            }
+            disabled={formatterState.extractionResults.length === 0}
+            onclick={handleResetExtraction}
+          >
+            ✕
+          </Button>
         </div>
       </div>
       
