@@ -245,4 +245,6 @@ export interface FormatterState {
   // Per-chunk streaming state
   activeStreamingChunkIndex: number | null;  // which chunk is currently streaming
   activeChunkStreamingText: string;          // accumulated tokens for active chunk
+  // Active processing chunk index (for source column highlighting)
+  activeProcessingChunkIndex: number | null;
 }

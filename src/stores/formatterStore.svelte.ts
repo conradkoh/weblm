@@ -73,6 +73,8 @@ const _state = $state<FormatterState>({
   // Per-chunk streaming state
   activeStreamingChunkIndex: null,
   activeChunkStreamingText: '',
+  // Active processing chunk index (for source column highlighting)
+  activeProcessingChunkIndex: null,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -636,6 +638,14 @@ export function clearActiveChunkStreaming(): void {
 }
 
 /**
+ * Set the active processing chunk index.
+ * Used for highlighting in the source column's ChunkList.
+ */
+export function setActiveProcessingChunkIndex(index: number | null): void {
+  _state.activeProcessingChunkIndex = index;
+}
+
+/**
  * Simple hash function for content change detection using djb2 algorithm.
  * 
  * ⚠️ WARNING: For very large content (1MB+), djb2 hash collisions become more likely.
@@ -833,6 +843,7 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
     // Per-chunk streaming callbacks
     const onChunkStreamStart = (index: number) => {
       setActiveStreamingChunk(index);
+      setActiveProcessingChunkIndex(index);
       clearActiveChunkStreaming();
     };
     
@@ -981,8 +992,10 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
     setRefinementState('error');
     _state.taskPlan.status = 'error';
     setCurrentPhase(`Error: ${errorMsg}`);
+    setActiveProcessingChunkIndex(null);
   } finally {
     _state.isProcessing = false;
+    setActiveProcessingChunkIndex(null);
   }
 }
 

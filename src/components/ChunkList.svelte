@@ -7,68 +7,32 @@
 
   import { getFormatterState, selectChunkForInspection } from '../stores/formatterStore.svelte';
   import type { ChunkPipelineData } from '../stores/types';
+  import ChunkProgressIndicator from './ChunkProgressIndicator.svelte';
 
   interface Props {
     chunks: ChunkPipelineData[];
     selectedIndex: number | null;
     onSelectChunk: (index: number) => void;
+    activeProcessingIndex?: number | null;
   }
 
-  let { chunks, selectedIndex, onSelectChunk }: Props = $props();
+  let { chunks, selectedIndex, onSelectChunk, activeProcessingIndex = null }: Props = $props();
 
   const formatterState = getFormatterState();
+  
+  // Track refs for auto-scrolling
+  let scrollContainer: HTMLDivElement | null = $state(null);
+  let chunkRefs: (HTMLButtonElement | null)[] = $state([]);
 
-  // Helper to get status dot style for each pipeline stage
-  function getStatusDot(status: ChunkPipelineData['status'], expected: 'formatted' | 'analyzed' | 'refined' | 'error'): {
-    icon: string;
-    color: string;
-    bgColor: string;
-  } {
-    const colorMap = {
-      formatted: {
-        icon: '✓',
-        color: 'text-green-600',
-        bgColor: 'bg-green-100 dark:bg-green-900/30',
-      },
-      analyzed: {
-        icon: '✓',
-        color: 'text-green-600',
-        bgColor: 'bg-green-100 dark:bg-green-900/30',
-      },
-      refined: {
-        icon: '✓',
-        color: 'text-green-600',
-        bgColor: 'bg-green-100 dark:bg-green-900/30',
-      },
-      error: {
-        icon: '✗',
-        color: 'text-red-600',
-        bgColor: 'bg-red-100 dark:bg-red-900/30',
-      },
-      pending: {
-        icon: '○',
-        color: 'text-gray-400',
-        bgColor: 'bg-gray-100 dark:bg-gray-800',
-      },
-      formatting: {
-        icon: '◐',
-        color: 'text-amber-500',
-        bgColor: 'bg-amber-100 dark:bg-amber-900/30',
-      },
-      analyzing: {
-        icon: '◐',
-        color: 'text-amber-500',
-        bgColor: 'bg-amber-100 dark:bg-amber-900/30',
-      },
-      refining: {
-        icon: '◐',
-        color: 'text-amber-500',
-        bgColor: 'bg-amber-100 dark:bg-amber-900/30',
-      },
-    };
-
-    return colorMap[status] ?? colorMap.pending;
-  }
+  // Auto-scroll to active processing chunk
+  $effect(() => {
+    if (activeProcessingIndex !== null && chunkRefs[activeProcessingIndex] && scrollContainer) {
+      chunkRefs[activeProcessingIndex]!.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  });
 
   // Truncate text for preview (first ~50 chars, preserve words)
   function truncateText(text: string, maxLength: number = 50): string {
@@ -95,21 +59,22 @@
   }
 </script>
 
-<div class="flex flex-col gap-1 overflow-y-auto max-h-[300px] min-h-[200px]">
+<div class="flex flex-col gap-1 overflow-y-auto max-h-[300px] min-h-[200px]" bind:this={scrollContainer}>
   {#each chunks as chunk, index (chunk.index)}
     {@const isSelected = selectedIndex === index}
-    {@const statusFormatted = getStatusDot(chunk.status, 'formatted')}
-    {@const statusAnalyzed = getStatusDot(chunk.status === 'analyzed' || chunk.status === 'refined' ? 'analyzed' : chunk.status === 'analyzing' ? 'analyzing' : 'pending', 'analyzed')}
-    {@const statusRefined = getStatusDot(chunk.status === 'refined' ? 'refined' : chunk.status === 'refining' ? 'refining' : 'pending', 'refined')}
+    {@const isActiveProcessing = activeProcessingIndex === index}
+    {@const isCompleted = chunk.status === 'formatted' || chunk.status === 'analyzed' || chunk.status === 'refined'}
     
     <button
       type="button"
-      class="flex items-center gap-3 p-2 rounded-md text-left transition-colors
+      bind:this={chunkRefs[index]}
+      class="flex items-center gap-3 p-2 rounded-md text-left transition-all duration-200
         {isSelected 
           ? 'bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700' 
           : 'hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent'
         }
-        {chunk.status === 'error' ? 'border-red-300 dark:border-red-700' : ''}
+        {chunk.status === 'error' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : ''}
+        {isActiveProcessing ? 'ring-2 ring-blue-400 dark:ring-blue-500 animate-pulse bg-blue-50 dark:bg-blue-900/20' : ''}
       "
       onclick={() => handleChunkClick(index)}
       onkeydown={(e) => handleKeyDown(e, index)}
@@ -119,23 +84,40 @@
       <!-- Status dots -->
       <div class="flex items-center gap-1 shrink-0" title="Status: {chunk.status}">
         <!-- Formatting status -->
-        <span class="w-3 h-3 rounded-full {statusFormatted.bgColor} {statusFormatted.color} text-[10px] font-bold flex items-center justify-center">
-          {statusFormatted.icon}
-        </span>
+        <ChunkProgressIndicator 
+          status={index === 0 && (chunk.status === 'formatting' || chunk.status === 'formatted') ? chunk.status : 'pending'}
+          size="sm"
+        />
         <!-- Analysis status -->
-        <span class="w-3 h-3 rounded-full {statusAnalyzed.bgColor} {statusAnalyzed.color} text-[10px] font-bold flex items-center justify-center">
-          {statusAnalyzed.icon}
-        </span>
+        <ChunkProgressIndicator 
+          status={chunk.status === 'analyzed' || chunk.status === 'refined' ? 'analyzed' : chunk.status === 'analyzing' ? 'analyzing' : 'pending'}
+          size="sm"
+        />
         <!-- Refinement status -->
-        <span class="w-3 h-3 rounded-full {statusRefined.bgColor} {statusRefined.color} text-[10px] font-bold flex items-center justify-center">
-          {statusRefined.icon}
-        </span>
+        <ChunkProgressIndicator 
+          status={chunk.status === 'refined' ? 'refined' : chunk.status === 'refining' ? 'refining' : 'pending'}
+          size="sm"
+        />
       </div>
 
       <!-- Chunk content preview -->
       <div class="flex-1 min-w-0">
-        <div class="text-xs font-mono text-gray-500 dark:text-slate-400 mb-0.5">
-          #{index + 1} · {chunk.rawTokenCount} tokens
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-mono text-gray-500 dark:text-slate-400">
+            #{index + 1}
+          </span>
+          {#if isActiveProcessing}
+            <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-medium">
+              Processing
+            </span>
+          {:else if isCompleted}
+            <span class="text-xs text-green-600 dark:text-green-400">
+              ✓
+            </span>
+          {/if}
+          <span class="text-xs font-mono text-gray-400 dark:text-slate-500">
+            {chunk.rawTokenCount} tokens
+          </span>
         </div>
         <div class="text-sm text-gray-800 dark:text-slate-200 truncate">
           {truncateText(chunk.rawText)}

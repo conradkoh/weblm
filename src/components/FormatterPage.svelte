@@ -576,6 +576,7 @@
           chunks={formatterState.pipelineData.chunks}
           selectedIndex={formatterState.pipelineData.selectedChunkIndex}
           onSelectChunk={handleSelectChunk}
+          activeProcessingIndex={formatterState.activeProcessingChunkIndex}
         />
       {:else}
         <Textarea
