@@ -12,6 +12,7 @@
   import ModelSelector from './ModelSelector.svelte';
   import ChunkList from './ChunkList.svelte';
   import ChunkDetail from './ChunkDetail.svelte';
+  import StreamingChunkCard from './StreamingChunkCard.svelte';
   import { setScreen } from '../stores/appStore.svelte';
   import { getEngineState, loadModel } from '../stores/engineStore.svelte';
   import {
@@ -279,6 +280,32 @@
   const processingStarted = $derived(
     hasPipelineData || formatterState.refinedChunks.length > 0
   );
+
+  // Show progressive output during refinement (not idle, complete, or error)
+  const showProgressiveOutput = $derived(
+    formatterState.refinementState === 'chunking' ||
+    formatterState.refinementState === 'formatting' ||
+    formatterState.refinementState === 'analyzing' ||
+    formatterState.refinementState === 'refining'
+  );
+
+  // Get status for a chunk at a given index
+  function getChunkStatus(index: number, totalChunks: number): 'pending' | 'streaming' | 'complete' {
+    const pipelineChunk = formatterState.pipelineData.chunks[index];
+    if (!pipelineChunk) return 'pending';
+    
+    // If chunk is completed in partial results, it's complete
+    if (index < formatterState.partialRefinedChunks.length) {
+      return 'complete';
+    }
+    
+    // If this is the next chunk to process, it's streaming
+    if (index === formatterState.partialRefinedChunks.length && showProgressiveOutput) {
+      return 'streaming';
+    }
+    
+    return 'pending';
+  }
 
   // Handler for chunk selection
   function handleSelectChunk(index: number): void {
@@ -725,6 +752,20 @@
         {:else if formatterState.extractionState === 'error'}
           <div class="flex items-center justify-center h-full text-red-500 dark:text-red-400 text-sm p-4">
             Extraction Error: {formatterState.errorMessage ?? 'Unknown error'}
+          </div>
+        {:else if showProgressiveOutput && formatterState.pipelineData.chunks.length > 0}
+          <!-- Progressive output: show chunks as they complete -->
+          <div class="p-3 space-y-3">
+            {#each formatterState.pipelineData.chunks as chunk, index (index)}
+              {@const status = getChunkStatus(index, formatterState.pipelineData.chunks.length)}
+              {@const content = formatterState.partialRefinedChunks[index] ?? null}
+              <StreamingChunkCard
+                {content}
+                {index}
+                {status}
+                streamingText={status === 'streaming' ? formatterState.streamingText : ''}
+              />
+            {/each}
           </div>
         {:else if formatterState.extractionResults.length === 0}
           {#if formatterState.refinedChunks.length === 0}
