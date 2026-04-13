@@ -546,9 +546,9 @@
     <FormatterLanding onModelLoaded={handleModelLoaded} />
   {:else}
     <!-- Workspace (model loaded) -->
-    <div class="flex flex-1 min-h-0 max-h-[calc(100vh-180px)]">
-      <!-- 3-column grid -->
-      <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Main content area -->
+      <div class="flex-1 relative overflow-y-auto">
 
     <!-- Empty State CTA: shown when no source content -->
     {#if !formatterState.sourceContent.trim() && !formatterState.isProcessing}
