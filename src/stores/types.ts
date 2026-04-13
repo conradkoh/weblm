@@ -145,6 +145,25 @@ export interface PipelineObservability {
   selectedChunkIndex: number | null;
 }
 
+// ─── Chunk Cache ─────────────────────────────────────────────────
+
+/**
+ * Single chunk cache entry for incremental caching.
+ * Stores refined text for each chunk based on its hash.
+ */
+export interface ChunkCacheEntry {
+  hash: string;
+  refinedText: string;
+  refinedAt: number;
+}
+
+
+/**
+ * Chunk cache map type.
+ * Uses Record<number, ...> for Svelte reactivity.
+ */
+export type ChunkCache = Record<number, ChunkCacheEntry>;
+
 // ─── Formatter ─────────────────────────────────────────────────
 
 export type RefinementState = 'idle' | 'chunking' | 'formatting' | 'analyzing' | 'refining' | 'complete' | 'error';
@@ -221,4 +240,6 @@ export interface FormatterState {
   currentChunkIndex: number;                    // selected chunk index for preview
   // Pipeline observability data
   pipelineData: PipelineObservability;
+  // Incremental chunk cache for resume functionality
+  chunkCache: ChunkCache;
 }

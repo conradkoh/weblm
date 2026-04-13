@@ -7,7 +7,7 @@
  */
 
 import { tick } from 'svelte';
-import type { FormatterState, RefinementState, ExtractionState, ExtractionResult, ChunkPipelineData, PipelineObservability, ChunkPipelineStatus, CohesionAnalysis } from './types';
+import type { FormatterState, RefinementState, ExtractionState, ExtractionResult, ChunkPipelineData, PipelineObservability, ChunkPipelineStatus, CohesionAnalysis, ChunkCache, ChunkCacheEntry } from './types';
 import { parseIntoChunks } from '../lib/formatter/chunker';
 import { refineChunks, type RefinementResult } from '../lib/formatter/refiner';
 import { LocalFormatterBackend } from '../lib/formatter/localBackend';
@@ -68,6 +68,8 @@ const _state = $state<FormatterState>({
     chunks: [],
     selectedChunkIndex: null,
   },
+  // Incremental chunk cache for resume functionality
+  chunkCache: {},
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -534,6 +536,75 @@ export function invalidateRefinementCache(): void {
   _state.sourceContentHash = null;
 }
 
+// ─── Chunk Cache Functions ──────────────────────────────────────
+
+/**
+ * Get cache entry for a specific chunk index.
+ */
+export function getChunkCacheEntry(index: number): ChunkCacheEntry | null {
+  return _state.chunkCache[index] ?? null;
+}
+
+/**
+ * Check if a chunk matches its cache entry.
+ * Returns true if cache exists and hash matches.
+ */
+export function isChunkCached(index: number, chunkText: string): boolean {
+  const entry = _state.chunkCache[index];
+  if (!entry) return false;
+  const chunkHash = computeContentHash(chunkText, chunkText.length);
+  return entry.hash === chunkHash;
+}
+
+/**
+ * Store a refined chunk in the cache.
+ */
+export function cacheRefinedChunk(index: number, chunkText: string, refinedText: string): void {
+  const hash = computeContentHash(chunkText, chunkText.length);
+  _state.chunkCache[index] = {
+    hash,
+    refinedText,
+    refinedAt: Date.now(),
+  };
+}
+
+/**
+ * Clear cache entries for chunks that no longer exist.
+ * Called when new chunk count is less than previous.
+ */
+export function pruneChunkCache(newChunkCount: number): void {
+  const oldIndices = Object.keys(_state.chunkCache)
+    .map(k => parseInt(k, 10))
+    .filter(i => i >= newChunkCount);
+  
+  for (const idx of oldIndices) {
+    delete _state.chunkCache[idx];
+  }
+  
+  if (oldIndices.length > 0) {
+    logger.debug(`ChunkCache: pruned ${oldIndices.length} stale entries`);
+  }
+}
+
+
+/**
+ * Clear all chunk cache entries.
+ */
+export function clearChunkCache(): void {
+  _state.chunkCache = {};
+  logger.debug('ChunkCache: cleared all entries');
+}
+
+/**
+ * Get cache statistics for logging.
+ */
+export function getChunkCacheStats(): { entries: number; totalBytes: number } {
+  const entries = Object.keys(_state.chunkCache).length;
+  const totalBytes = Object.values(_state.chunkCache)
+    .reduce((sum, entry) => sum + entry.refinedText.length, 0);
+  return { entries, totalBytes };
+}
+
 /**
  * Simple hash function for content change detection using djb2 algorithm.
  * 
@@ -757,41 +828,107 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       setChunkRefining(i);
     }
     
-    const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses, backend, { onToken: streamingCallback });
+    // Incremental caching: check which chunks need refinement
+    const cacheStats = getChunkCacheStats();
+    logger.info(`ChunkCache: ${cacheStats.entries} entries (${Math.round(cacheStats.totalBytes / 1024)}KB) in cache`);
     
-    if (refinementResult.success) {
-      // Validate chunk sizes (800 tokens max, ~3200 chars)
-      const validChunks = refinementResult.refinedChunks.filter(c => {
-        return estimateTokenCount(c) <= 800;
-      });
-      
-      // Update pipeline data with refinement results
-      for (let i = 0; i < refinementResult.refinedChunks.length; i++) {
-        updateChunkRefinement(i, refinementResult.refinedChunks[i] ?? '');
+    // Identify chunks to refine vs use from cache
+    const chunksToRefine: { index: number; chunk: string; analysis: CohesionAnalysis }[] = [];
+    const cachedResults: string[] = [];
+    let cacheHits = 0;
+    let cacheMisses = 0;
+    
+    for (let i = 0; i < formattedChunks.length; i++) {
+      const chunk = formattedChunks[i]!;
+      if (isChunkCached(i, chunk)) {
+        const entry = getChunkCacheEntry(i);
+        cachedResults.push(entry!.refinedText);
+        cacheHits++;
+        logger.debug(`ChunkCache: HIT for chunk ${i}`);
+      } else {
+        const analysis = analyses[i] ?? { hasIssues: false, issues: [], summary: '' };
+        chunksToRefine.push({ index: i, chunk, analysis });
+        cacheMisses++;
+        logger.debug(`ChunkCache: MISS for chunk ${i}`);
       }
-      
-      _state.refinedChunks = validChunks;
-      // Store content hash for cache
-      _state.sourceContentHash = computeContentHash(sourceContent, sourceContent.length);
-      _state.runCompletedAt = Date.now();
-      updatePhaseProgress(1);
-      completeTaskPlan();
-      setRefinementState('complete');
-      setCurrentPhase(`Refinement complete: ${validChunks.length} refined chunks`);
-      logger.info(`Refinement: Complete with ${validChunks.length} refined chunks`);
-    } else {
-      // Fall back to formatted chunks if refinement failed
-      _state.refinedChunks = formattedChunks;
-      // Store content hash for cache
-      _state.sourceContentHash = computeContentHash(sourceContent, sourceContent.length);
-      _state.runCompletedAt = Date.now();
-      updatePhaseProgress(1);
-      completeTaskPlan();
-      setRefinementState('complete');
-      setCurrentPhase(`Formatting complete (${formattedChunks.length} chunks)`);
-      logger.warn('Refinement: Refinement failed, using formatted chunks instead');
     }
-
+    
+    logger.info(`ChunkCache: ${cacheHits} hits, ${cacheMisses} misses (${chunksToRefine.length} chunks need refinement)`);
+    
+    let refinedChunks: string[] = [];
+    
+    if (chunksToRefine.length === 0) {
+      // All chunks are cached, use cached results
+      refinedChunks = cachedResults;
+      logger.info('ChunkCache: All chunks from cache, skipping refinement');
+    } else if (chunksToRefine.length < formattedChunks.length) {
+      // Partial cache - refine only missing chunks
+      // Group consecutive chunks for batch processing
+      const chunksForRefinement = chunksToRefine.map(c => c.chunk);
+      const analysesForRefinement = chunksToRefine.map(c => c.analysis);
+      
+      const partialResult: RefinementResult = await refineChunks(chunksForRefinement, analysesForRefinement, backend, { onToken: streamingCallback });
+      
+      if (partialResult.success) {
+        // Map results back to correct positions and merge with cached
+        refinedChunks = new Array(formattedChunks.length).fill('');
+        let refinedIdx = 0;
+        let cacheIdx = 0;
+        
+        for (let i = 0; i < formattedChunks.length; i++) {
+          if (isChunkCached(i, formattedChunks[i]!)) {
+            refinedChunks[i] = getChunkCacheEntry(i)!.refinedText;
+          } else {
+            refinedChunks[i] = partialResult.refinedChunks[refinedIdx] ?? formattedChunks[i]!;
+            // Cache the refined chunk
+            cacheRefinedChunk(i, formattedChunks[i]!, refinedChunks[i]!);
+            refinedIdx++;
+          }
+        }
+      } else {
+        refinedChunks = formattedChunks;
+      }
+    } else {
+      // No cache hits - refine all chunks normally
+      const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses, backend, { onToken: streamingCallback });
+      
+      if (refinementResult.success) {
+        refinedChunks = refinementResult.refinedChunks;
+        // Cache all refined chunks
+        for (let i = 0; i < refinedChunks.length; i++) {
+          cacheRefinedChunk(i, formattedChunks[i]!, refinedChunks[i]!);
+        }
+      } else {
+        refinedChunks = formattedChunks;
+      }
+    }
+    
+    const finalCacheStats = getChunkCacheStats();
+    logger.info(`ChunkCache: ${finalCacheStats.entries} entries after refinement`);
+    
+    // Prune cache for chunks that no longer exist
+    pruneChunkCache(refinedChunks.length);
+    
+    // Validate chunk sizes (800 tokens max, ~3200 chars)
+    const validChunks = refinedChunks.filter(c => {
+      return estimateTokenCount(c) <= 800;
+    });
+    
+    // Update pipeline data with refinement results
+    for (let i = 0; i < refinedChunks.length; i++) {
+      updateChunkRefinement(i, refinedChunks[i] ?? '');
+    }
+    
+    _state.refinedChunks = validChunks;
+    // Store content hash for cache
+    _state.sourceContentHash = computeContentHash(sourceContent, sourceContent.length);
+    _state.runCompletedAt = Date.now();
+    updatePhaseProgress(1);
+    completeTaskPlan();
+    setRefinementState('complete');
+    setCurrentPhase(`Refinement complete: ${validChunks.length} refined chunks`);
+    logger.info(`Refinement: Complete with ${validChunks.length} refined chunks`);
+  
   } catch (err) {
     _state.runCompletedAt = Date.now();
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
