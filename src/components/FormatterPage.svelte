@@ -38,6 +38,7 @@
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
   import { renderMarkdown } from '../lib/markdown';
+  import { TEST_SOURCE_CONTENT, TEST_DESIRED_FORMAT } from '../lib/formatter/testData';
   import type { ExtractionResult } from '../stores/types';
 
   const formatterState = getFormatterState();
@@ -121,6 +122,11 @@
 
   function handleGoHome(): void {
     setScreen('launcher-home');
+  }
+
+  function handleLoadTestData(): void {
+    setSourceContent(TEST_SOURCE_CONTENT);
+    setDesiredFormat(TEST_DESIRED_FORMAT);
   }
 
   async function handleLoadModel(): Promise<void> {
@@ -494,6 +500,14 @@
           {/if}
         </div>
         <div class="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Load test data for demo"
+            onclick={handleLoadTestData}
+          >
+            📋 Test Data
+          </Button>
           {#if formatterState.refinedChunks.length > 0 && formatterState.refinementState === 'complete'}
             <Button
               variant="outline"
