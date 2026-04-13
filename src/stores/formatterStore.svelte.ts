@@ -655,7 +655,7 @@ export function getFormatterBackend(): FormatterBackend {
   // Priority 1: Worker Pool (lazy import to avoid bundling issues)
   if (_state.useWorkerPool && _state.workerModelId) {
     logger.info(`Using WorkerPoolFormatterBackend (${_state.workerPoolSize} workers)`);
-    const { WorkerPoolFormatterBackend } = require('./workerBackend');
+    const { WorkerPoolFormatterBackend } = require('../lib/formatter/workerBackend');
     return new WorkerPoolFormatterBackend(_state.workerModelId, _state.workerPoolSize);
   }
   
