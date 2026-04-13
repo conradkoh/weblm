@@ -7,7 +7,7 @@
  */
 
 import { tick } from 'svelte';
-import type { FormatterState, RefinementState, ExtractionState, ExtractionResult } from './types';
+import type { FormatterState, RefinementState, ExtractionState, ExtractionResult, ChunkPipelineData, PipelineObservability, ChunkPipelineStatus, CohesionAnalysis } from './types';
 import { parseIntoChunks } from '../lib/formatter/chunker';
 import { refineChunks, type RefinementResult } from '../lib/formatter/refiner';
 import { LocalFormatterBackend } from '../lib/formatter/localBackend';
@@ -63,6 +63,11 @@ const _state = $state<FormatterState>({
   // Markdown preview mode
   previewMode: 'raw',
   currentChunkIndex: 0,
+  // Pipeline observability data
+  pipelineData: {
+    chunks: [],
+    selectedChunkIndex: null,
+  },
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -321,6 +326,209 @@ export function prevChunk(): void {
   }
 }
 
+// Pipeline observability functions
+/**
+ * Initialize pipeline data for all chunks at the start of refinement.
+ * Creates ChunkPipelineData entries with raw text and token counts.
+ */
+export function initPipelineData(rawChunks: string[]): void {
+  _state.pipelineData = {
+    chunks: rawChunks.map((rawText, index) => ({
+      index,
+      rawText,
+      rawTokenCount: estimateTokenCount(rawText),
+      formattedText: null,
+      formattedAt: null,
+      cohesionWithNext: null,
+      cohesionWithPrev: null,
+      analyzedAt: null,
+      refinedText: null,
+      refinedAt: null,
+      wasModified: false,
+      status: 'pending' as ChunkPipelineStatus,
+      error: null,
+    })),
+    selectedChunkIndex: null,
+  };
+  logger.debug(`PipelineData: initialized ${rawChunks.length} chunks`);
+}
+
+/**
+ * Update a chunk's formatting status and output.
+ */
+export function updateChunkFormatting(index: number, formattedText: string): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      formattedText,
+      formattedAt: Date.now(),
+      status: 'formatted',
+    };
+    _state.pipelineData.chunks = [
+      ...chunks.slice(0, index),
+      chunk,
+      ...chunks.slice(index + 1),
+    ];
+  }
+}
+
+/**
+ * Mark a chunk as currently formatting.
+ */
+export function setChunkFormatting(index: number): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      status: 'formatting',
+    };
+    _state.pipelineData.chunks = [
+      ...chunks.slice(0, index),
+      chunk,
+      ...chunks.slice(index + 1),
+    ];
+  }
+}
+
+/**
+ * Update a chunk's cohesion analysis results.
+ */
+export function updateChunkAnalysis(index: number, cohesionWithNext: CohesionAnalysis | null): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      cohesionWithNext,
+      analyzedAt: Date.now(),
+      status: 'analyzed',
+    };
+    // Also update previous chunk's cohesionWithPrev if this is chunk > 0
+    if (index > 0) {
+      const prevExisting = chunks[index - 1]!;
+      const prevChunk: ChunkPipelineData = {
+        ...prevExisting,
+        cohesionWithPrev: cohesionWithNext,
+        status: 'analyzed',
+        analyzedAt: Date.now(),
+      };
+      _state.pipelineData.chunks = [
+        ...chunks.slice(0, index - 1),
+        prevChunk,
+        chunk,
+        ...chunks.slice(index + 1),
+      ];
+    } else {
+      _state.pipelineData.chunks = [
+        ...chunks.slice(0, index),
+        chunk,
+        ...chunks.slice(index + 1),
+      ];
+    }
+  }
+}
+
+/**
+ * Mark a chunk as currently analyzing.
+ */
+export function setChunkAnalyzing(index: number): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      status: 'analyzing',
+    };
+    _state.pipelineData.chunks = [
+      ...chunks.slice(0, index),
+      chunk,
+      ...chunks.slice(index + 1),
+    ];
+  }
+}
+
+/**
+ * Update a chunk's refinement result.
+ */
+export function updateChunkRefinement(index: number, refinedText: string): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const wasModified = existing.formattedText !== null && refinedText !== existing.formattedText;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      refinedText,
+      refinedAt: Date.now(),
+      wasModified,
+      status: 'refined',
+    };
+    _state.pipelineData.chunks = [
+      ...chunks.slice(0, index),
+      chunk,
+      ...chunks.slice(index + 1),
+    ];
+  }
+}
+
+/**
+ * Mark a chunk as currently refining.
+ */
+export function setChunkRefining(index: number): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      status: 'refining',
+    };
+    _state.pipelineData.chunks = [
+      ...chunks.slice(0, index),
+      chunk,
+      ...chunks.slice(index + 1),
+    ];
+  }
+}
+
+/**
+ * Mark a chunk as having an error.
+ */
+export function setChunkError(index: number, error: string): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      status: 'error',
+      error,
+    };
+    _state.pipelineData.chunks = [
+      ...chunks.slice(0, index),
+      chunk,
+      ...chunks.slice(index + 1),
+    ];
+  }
+}
+
+/**
+ * Select a chunk for inspection in the pipeline detail panel.
+ */
+export function selectChunkForInspection(index: number | null): void {
+  _state.pipelineData.selectedChunkIndex = index;
+}
+
+/**
+ * Clear pipeline data when refinement is reset.
+ */
+export function clearPipelineData(): void {
+  _state.pipelineData = {
+    chunks: [],
+    selectedChunkIndex: null,
+  };
+}
+
 // Cache functions for refinement results
 export function invalidateRefinementCache(): void {
   _state.sourceContentHash = null;
@@ -448,6 +656,9 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
     
     logger.info(`Refinement: Created ${chunks.length} chunks`);
 
+    // Initialize pipeline observability data
+    initPipelineData(chunks);
+
     // Initialize task plan with 3 phases based on chunk count
     // Refinement has 3 phases: Formatting (N steps), Analyzing (N-1 steps), Refining (1 step)
     initTaskPlan([
@@ -508,9 +719,12 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       await tick(); // Allow UI to repaint after state update
     };
     
-    // Chunk complete callback for progressive output
-    const onChunkComplete = (chunk: string, index: number) => {
-      addPartialRefinedChunk(chunk);
+    // Chunk complete callback for progressive output and pipeline observability
+    const onChunkComplete = (formattedChunk: string, index: number) => {
+      addPartialRefinedChunk(formattedChunk);
+      // Update pipeline data with formatting result
+      setChunkFormatting(index);
+      updateChunkFormatting(index, formattedChunk);
     };
     
     const { formattedChunks, analyses } = await processPipeline(
@@ -520,6 +734,12 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       streamingCallback,
       onChunkComplete
     );
+    
+    // Update pipeline data with analysis results
+    for (let i = 0; i < analyses.length; i++) {
+      setChunkAnalyzing(i);
+      updateChunkAnalysis(i, analyses[i] ?? null);
+    }
     
     logger.info(`Refinement: Pipeline complete with ${formattedChunks.length} chunks and ${analyses.length} analyses`);
     
@@ -532,6 +752,11 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
     clearStreamingText();
     logger.info('Refinement: Starting chunk refinement');
     
+    // Mark all chunks as refining in pipeline data
+    for (let i = 0; i < formattedChunks.length; i++) {
+      setChunkRefining(i);
+    }
+    
     const refinementResult: RefinementResult = await refineChunks(formattedChunks, analyses, backend, { onToken: streamingCallback });
     
     if (refinementResult.success) {
@@ -539,6 +764,11 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       const validChunks = refinementResult.refinedChunks.filter(c => {
         return estimateTokenCount(c) <= 800;
       });
+      
+      // Update pipeline data with refinement results
+      for (let i = 0; i < refinementResult.refinedChunks.length; i++) {
+        updateChunkRefinement(i, refinementResult.refinedChunks[i] ?? '');
+      }
       
       _state.refinedChunks = validChunks;
       // Store content hash for cache
@@ -595,6 +825,7 @@ export function resetRefinement(): void {
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();
+  clearPipelineData();
 }
 
 // ─── Extraction Pipeline ──────────────────────────────────────
@@ -725,6 +956,7 @@ export function resetExtraction(): void {
   _state.isStopped = false;
   resetTaskPlan();
   clearStreamingText();
+  clearPipelineData();
 }
 
 /**

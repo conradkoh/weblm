@@ -8,8 +8,9 @@
 import type { ChatMessage } from '../types';
 import type { ModelProgress } from '../engine/types';
 import type { Theme } from '../settings';
+import type { CohesionAnalysis } from '../lib/formatter/cohesionAnalyzer';
 
-export type { ChatMessage, ModelProgress, Theme };
+export type { ChatMessage, ModelProgress, Theme, CohesionAnalysis };
 
 // ─── App ──────────────────────────────────────────────────────
 
@@ -72,6 +73,76 @@ export interface SettingsState {
   systemPrompt: string;
   theme: Theme;
   showMetrics: boolean;
+}
+
+// ─── Pipeline Observability ─────────────────────────────────────────
+
+/**
+ * Pipeline status for each chunk through refinement stages.
+ * Tracks the chunk's progress through: parsing → formatting → analyzing → refining
+ */
+export type ChunkPipelineStatus = 
+  | 'pending'      // chunk created, waiting to be processed
+  | 'formatting'   // currently formatting this chunk
+  | 'formatted'   // formatting complete
+  | 'analyzing'    // currently analyzing cohesion
+  | 'analyzed'     // analysis complete
+  | 'refining'     // currently refining this chunk
+  | 'refined'      // refinement complete
+  | 'error';       // an error occurred
+
+/**
+ * Pipeline data for a single chunk through the refinement pipeline.
+ * Allows observing intermediate outputs at each stage.
+ */
+export interface ChunkPipelineData {
+  /** Chunk position in the array */
+  index: number;
+  
+  // Stage 1: Raw input
+  /** Original text from parseIntoChunks() */
+  rawText: string;
+  /** Estimated token count of raw text */
+  rawTokenCount: number;
+  
+  // Stage 2: Formatted output
+  /** Markdown-formatted version of the chunk */
+  formattedText: string | null;
+  /** Timestamp when formatting completed (ms) */
+  formattedAt: number | null;
+  
+  // Stage 3: Cohesion analysis
+  /** Analysis result with this chunk as the first in the pair */
+  cohesionWithNext: CohesionAnalysis | null;
+  /** Analysis result with this chunk as the second in the pair (from previous chunk's analysis) */
+  cohesionWithPrev: CohesionAnalysis | null;
+  /** Timestamp when analysis completed (ms) */
+  analyzedAt: number | null;
+  
+  // Stage 4: Refined output
+  /** Final refined version after addressing cohesion issues */
+  refinedText: string | null;
+  /** Timestamp when refinement completed (ms) */
+  refinedAt: number | null;
+  /** Whether refining made changes vs formatted version */
+  wasModified: boolean;
+  
+  // Status tracking
+  /** Current pipeline stage */
+  status: ChunkPipelineStatus;
+  /** Error message if status is 'error' */
+  error: string | null;
+}
+
+/**
+ * Container for pipeline observability data.
+ * Provides visibility into intermediate pipeline outputs.
+ */
+export interface PipelineObservability {
+  /** Pipeline data for each chunk */
+  chunks: ChunkPipelineData[];
+  /** Currently selected chunk index for inspection panel */
+  selectedChunkIndex: number | null;
 }
 
 // ─── Formatter ─────────────────────────────────────────────────
@@ -148,4 +219,6 @@ export interface FormatterState {
   // Markdown preview mode
   previewMode: 'raw' | 'preview' | 'chunks';  // current view mode
   currentChunkIndex: number;                    // selected chunk index for preview
+  // Pipeline observability data
+  pipelineData: PipelineObservability;
 }
