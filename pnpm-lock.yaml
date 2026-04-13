@@ -14,6 +14,9 @@ importers:
       '@mlc-ai/web-llm':
         specifier: ^0.2.82
         version: 0.2.82
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
