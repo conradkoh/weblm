@@ -4,6 +4,7 @@
    * 3-column layout: Source | Desired Format | Output
    * Handles content input, format instructions, and displays output results.
    * Includes source refinement (Phase 2) and extraction (Phase 3).
+   * Two-state: Landing (no model) / Workspace (model loaded)
    */
 
   import { Button } from '$ui/button';
@@ -15,6 +16,8 @@
   import StreamingChunkCard from './StreamingChunkCard.svelte';
   import FollowLatestButton from './FollowLatestButton.svelte';
   import PhaseTransitionBanner from './PhaseTransitionBanner.svelte';
+  import FormatterLanding from './FormatterLanding.svelte';
+  import FormatterModelBar from './FormatterModelBar.svelte';
   import { setScreen } from '../stores/appStore.svelte';
   import { getEngineState, loadModel } from '../stores/engineStore.svelte';
   import {
@@ -67,6 +70,13 @@
     formatterState.selectedModelId !== null && 
     engineState.currentModelId === formatterState.selectedModelId
   );
+
+  // Handle model loaded from landing page
+  function handleModelLoaded(): void {
+    // Model loaded, UI will react to modelLoaded becoming true
+    // Force refresh to show workspace
+    loadFromLocalStorage();
+  }
 
   // Load persisted data on mount
   $effect(() => {
@@ -436,117 +446,101 @@
   </div>
   <Separator />
 
-  <!-- Model Selector Row -->
-  <div class="px-4 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
-    <div class="max-w-2xl mx-auto">
-      <div class="flex items-center gap-2">
-        <div class="flex-1">
-          <ModelSelector
-            cachedModelIds={engineState.cachedModelIds}
-            selectedModelId={formatterState.selectedModelId ?? ''}
-            onModelSelect={handleModelSelect}
-          />
-        </div>
-        <Button
-          size="sm"
-          variant={modelLoaded ? "outline" : "default"}
-          onclick={handleLoadModel}
-          disabled={!formatterState.selectedModelId || isLoadingModel}
-        >
-          {#if isLoadingModel}
-            ⏳
-          {:else if modelLoaded}
-            ✓ Loaded
-          {:else}
-            ▶ Load
-          {/if}
-        </Button>
-      </div>
-    </div>
-  </div>
-  <Separator />
+  <!-- Model Selector Row (compact, shown when model loaded) -->
+  {#if modelLoaded}
+    <FormatterModelBar />
+    <Separator />
+  {/if}
 
-  <!-- Worker Pool Settings (Collapsible, Experimental) -->
-  <div class="px-4 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
-    <button
-      type="button"
-      class="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 w-full"
-      onclick={() => workerPoolExpanded = !workerPoolExpanded}
-    >
-      <span>{workerPoolExpanded ? '▼' : '▶'}</span>
-      <span>⚡ Worker Pool (Experimental)</span>
-      {#if formatterState.useWorkerPool && formatterState.workerModelId}
-        <span class="text-xs px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400">
-          {formatterState.workerPoolSize} workers
-        </span>
-      {:else if formatterState.useWorkerPool}
-        <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400">
-          ⚠ Select model
-        </span>
-      {/if}
-    </button>
-    {#if workerPoolExpanded}
-      <div class="mt-2 p-3 bg-white dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
-        <label class="flex items-center gap-2 mb-3">
-          <input
-            type="checkbox"
-            checked={formatterState.useWorkerPool}
-            onchange={handleWorkerPoolToggle}
-            class="rounded border-gray-300 dark:border-slate-600"
-          />
-          <span class="text-sm font-medium text-gray-700 dark:text-slate-300">Use Worker Pool</span>
-          {#if formatterState.useWorkerPool}
-            <span class="text-xs text-gray-500 dark:text-slate-500">({backendTypeLabel})</span>
-          {/if}
-        </label>
-        {#if formatterState.useWorkerPool}
-          <div class="space-y-3">
-            <div>
-              <label for="worker-model" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-                Worker Model (Transformers.js compatible)
-              </label>
-              <input
-                id="worker-model"
-                type="text"
-                value={formatterState.workerModelId}
-                oninput={handleWorkerModelIdChange}
-                placeholder="Xenova/phi-2"
-                class="w-full px-3 py-1.5 text-sm rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900"
-              />
-              <p class="text-xs text-gray-500 dark:text-slate-500 mt-1">
-                Must be a model compatible with Transformers.js (e.g., Xenova/phi-2)
-              </p>
-            </div>
-            <div>
-              <label for="worker-size" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-                Number of Workers (1-4)
-              </label>
-              <input
-                id="worker-size"
-                type="range"
-                min="1"
-                max="4"
-                value={formatterState.workerPoolSize}
-                oninput={handleWorkerPoolSizeChange}
-                class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 dark:bg-slate-600"
-              />
-              <div class="flex justify-between text-xs text-gray-500 dark:text-slate-500 mt-1">
-                <span>1</span>
-                <span>Current: {formatterState.workerPoolSize}</span>
-                <span>4</span>
-              </div>
-              <p class="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                ⚠️ Each worker loads its own model copy. Memory usage = workers × model size.
-              </p>
-            </div>
-          </div>
+  <!-- Worker Pool Settings (Collapsible, Experimental) - only show when model loaded -->
+  {#if modelLoaded}
+    <div class="px-4 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+      <button
+        type="button"
+        class="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 w-full"
+        onclick={() => workerPoolExpanded = !workerPoolExpanded}
+      >
+        <span>{workerPoolExpanded ? '▼' : '▶'}</span>
+        <span>⚡ Worker Pool (Experimental)</span>
+        {#if formatterState.useWorkerPool && formatterState.workerModelId}
+          <span class="text-xs px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400">
+            {formatterState.workerPoolSize} workers
+          </span>
+        {:else if formatterState.useWorkerPool}
+          <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400">
+            ⚠ Select model
+          </span>
         {/if}
-      </div>
-    {/if}
-  </div>
-  <Separator />
+      </button>
+      {#if workerPoolExpanded}
+        <div class="mt-2 p-3 bg-white dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
+          <label class="flex items-center gap-2 mb-3">
+            <input
+              type="checkbox"
+              checked={formatterState.useWorkerPool}
+              onchange={handleWorkerPoolToggle}
+              class="rounded border-gray-300 dark:border-slate-600"
+            />
+            <span class="text-sm font-medium text-gray-700 dark:text-slate-300">Use Worker Pool</span>
+            {#if formatterState.useWorkerPool}
+              <span class="text-xs text-gray-500 dark:text-slate-500">({backendTypeLabel})</span>
+            {/if}
+          </label>
+          {#if formatterState.useWorkerPool}
+            <div class="space-y-3">
+              <div>
+                <label for="worker-model" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                  Worker Model (Transformers.js compatible)
+                </label>
+                <input
+                  id="worker-model"
+                  type="text"
+                  value={formatterState.workerModelId}
+                  oninput={handleWorkerModelIdChange}
+                  placeholder="Xenova/phi-2"
+                  class="w-full px-3 py-1.5 text-sm rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900"
+                />
+                <p class="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                  Must be a model compatible with Transformers.js (e.g., Xenova/phi-2)
+                </p>
+              </div>
+              <div>
+                <label for="worker-size" class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                  Number of Workers (1-4)
+                </label>
+                <input
+                  id="worker-size"
+                  type="range"
+                  min="1"
+                  max="4"
+                  value={formatterState.workerPoolSize}
+                  oninput={handleWorkerPoolSizeChange}
+                  class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 dark:bg-slate-600"
+                />
+                <div class="flex justify-between text-xs text-gray-500 dark:text-slate-500 mt-1">
+                  <span>1</span>
+                  <span>Current: {formatterState.workerPoolSize}</span>
+                  <span>4</span>
+                </div>
+                <p class="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                  ⚠️ Each worker loads its own model copy. Memory usage = workers × model size.
+                </p>
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </div>
+    <Separator />
+  {/if}
 
-  <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 min-h-0 max-h-[calc(100vh-180px)] overflow-hidden">
+  <!-- Main content: Landing or Workspace -->
+  {#if !modelLoaded}
+    <!-- Landing page -->
+    <FormatterLanding onModelLoaded={handleModelLoaded} />
+  {:else}
+    <!-- Workspace (model loaded) -->
+    <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 min-h-0 max-h-[calc(100vh-180px)] overflow-hidden">
     <!-- Source Column -->
     <div class="flex flex-col gap-2 min-h-0">
       <div class="flex items-center justify-between">
@@ -1058,5 +1052,8 @@
     <div class="px-4 py-2 bg-gray-100 dark:bg-slate-800/80 text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">
       💡 Click "Refine Source" to process your content
     </div>
+  {/if}
+
+    <!-- End of Workspace -->
   {/if}
 </div>
