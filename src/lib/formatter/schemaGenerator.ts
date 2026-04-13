@@ -1,4 +1,5 @@
 import type { ExtractionSchema, SchemaField } from './extractionSchema';
+import type { FormatterBackend } from './backend';
 
 /**
  * Prompt template for generating extraction schema from user description.
@@ -42,6 +43,16 @@ Input JSON:
 {inputJson}
 
 Respond ONLY with valid JSON.`;
+
+/**
+ * Interface for LLM backend that can generate text (legacy).
+ */
+export interface LLMBackend {
+  /**
+   * Generate text completion from a prompt.
+   */
+  complete(prompt: string, options?: { maxTokens?: number }): Promise<string>;
+}
 
 /**
  * Result formatter for comma-delimited aggregation.
@@ -117,7 +128,7 @@ function parseSchemaFromResponse(response: string): ExtractionSchema | null {
 /**
  * Generates an ExtractionSchema from a user-provided description of desired format.
  *
- * @param backend - The LLM backend to use for generation
+ * @param backend - The LLM backend to use for generation (LLMBackend with complete() method)
  * @param desiredFormat - Natural language description of what data to extract
  * @returns The generated ExtractionSchema or null if generation failed
  */
@@ -129,6 +140,29 @@ export async function generateSchemaFromDescription(
 
   try {
     const response = await backend.complete(prompt);
+    return parseSchemaFromResponse(response);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generates an ExtractionSchema using FormatterBackend.
+ *
+ * @param backend - The FormatterBackend to use for generation
+ * @param desiredFormat - Natural language description of what data to extract
+ * @returns The generated ExtractionSchema or null if generation failed
+ */
+export async function generateExtractionSchema(
+  backend: FormatterBackend,
+  desiredFormat: string
+): Promise<ExtractionSchema | null> {
+  const prompt = SCHEMA_GENERATION_PROMPT.replace('{desiredFormat}', desiredFormat);
+
+  try {
+    const response = await backend.generate([
+      { id: crypto.randomUUID(), role: 'user', content: prompt, timestamp: new Date().toISOString() }
+    ]);
     return parseSchemaFromResponse(response);
   } catch {
     return null;

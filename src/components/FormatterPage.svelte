@@ -39,6 +39,9 @@
     prevChunk,
     selectChunkForInspection,
     retryChunk,
+    generateSchema,
+    runStructuredExtraction,
+    resetStructuredExtraction,
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
   import { renderMarkdown } from '../lib/markdown';
@@ -634,14 +637,30 @@
           Desired Format
         </label>
         {#if formatterState.refinedChunks.length > 0}
-          <Button
-            variant="default"
-            size="sm"
-            disabled={isExtracting || !formatterState.desiredFormat.trim()}
-            onclick={handleRunExtraction}
-          >
-            {isExtracting ? 'Extracting...' : 'Run Extraction'}
-          </Button>
+          <div class="flex items-center gap-2">
+            <!-- Generate Schema button -->
+            {#if formatterState.schemaGenerationState === 'idle' || formatterState.schemaGenerationState === 'error'}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!formatterState.desiredFormat.trim() || formatterState.isProcessing}
+                onclick={generateSchema}
+              >
+                Generate Schema
+              </Button>
+            {:else if formatterState.schemaGenerationState === 'generating'}
+              <span class="text-xs text-gray-500 dark:text-slate-400">Generating schema...</span>
+            {/if}
+            <!-- Run Extraction button (structured) -->
+            <Button
+              variant="default"
+              size="sm"
+              disabled={formatterState.isProcessing || !formatterState.desiredFormat.trim() || formatterState.refinedChunks.length === 0}
+              onclick={runStructuredExtraction}
+            >
+              {formatterState.isProcessing ? 'Processing...' : 'Run Structured Extraction'}
+            </Button>
+          </div>
         {/if}
       </div>
       <Textarea
@@ -652,6 +671,35 @@
         oninput={handleFormatChange}
         disabled={isRefining || isExtracting}
       />
+      
+      <!-- Schema display -->
+      {#if formatterState.extractionSchema && formatterState.schemaGenerationState === 'complete'}
+        <div class="mt-2 p-3 bg-gray-100 dark:bg-slate-700/50 rounded border border-gray-200 dark:border-slate-600">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-medium text-xs text-gray-700 dark:text-slate-300">
+              Schema ({formatterState.extractionSchema.fields.length} fields)
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onclick={resetStructuredExtraction}
+            >
+              ✕
+            </Button>
+          </div>
+          <div class="space-y-1 max-h-[150px] overflow-y-auto">
+            {#each formatterState.extractionSchema.fields as field}
+              <div class="text-xs">
+                <span class="font-mono text-indigo-600 dark:text-indigo-400">{field.path}</span>
+                <span class="ml-1 text-gray-500 dark:text-slate-500">({field.type})</span>
+                {#if field.description}
+                  <span class="ml-1 text-gray-400 dark:text-slate-400">— {field.description}</span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Output Column -->
@@ -864,6 +912,47 @@
                 </div>
               </details>
             {/each}
+          </div>
+        {/if}
+        
+        <!-- Structured Extraction: Rendered Report -->
+        {#if formatterState.structuredExtractionState === 'complete' && formatterState.renderedReport}
+          <div class="p-4">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-slate-700">
+              <span class="font-medium text-sm text-indigo-600 dark:text-indigo-400">Structured Extraction Report</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onclick={() => navigator.clipboard.writeText(formatterState.renderedReport ?? '')}
+              >
+                📋 Copy
+              </Button>
+            </div>
+            <div class="prose prose-sm dark:prose-invert max-w-none">
+              <pre class="whitespace-pre-wrap text-sm font-mono bg-white dark:bg-slate-800 p-3 rounded border border-gray-200 dark:border-slate-700">{formatterState.renderedReport}</pre>
+            </div>
+            
+            <!-- Per-chunk extraction results -->
+            {#if formatterState.structuredResults.length > 0}
+              <div class="mt-4">
+                <span class="text-xs font-medium text-gray-600 dark:text-slate-400">Per-Chunk Data</span>
+                <div class="mt-2 space-y-2">
+                  {#each formatterState.structuredResults as chunkResult}
+                    <div class="p-2 bg-gray-100 dark:bg-slate-700/50 rounded text-xs">
+                      <span class="font-medium text-gray-600 dark:text-slate-400">Chunk {chunkResult.chunkIndex + 1}:</span>
+                      <div class="mt-1 pl-2 font-mono">
+                        {#each Object.entries(chunkResult.data) as [key, value]}
+                          <div>
+                            <span class="text-indigo-600 dark:text-indigo-400">{key}:</span>
+                            <span class="ml-1">{value === null ? '(null)' : Array.isArray(value) ? value.join(', ') : value}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           </div>
         {/if}
       </div>

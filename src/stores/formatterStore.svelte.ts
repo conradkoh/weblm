@@ -20,6 +20,11 @@ import { formatChunkToMarkdown } from '../lib/formatter/markdownFormatter';
 import { getEngineInstance } from '../engine/engine-factory';
 import { computeContentHash, createCacheEntry, getIndicesToPrune, getCacheStats } from '../lib/formatter/chunkCacheUtils';
 import { logger } from '../logger';
+import { generateExtractionSchema } from '../lib/formatter/schemaGenerator';
+import { extractAllChunks, type ChunkExtractionResult } from '../lib/formatter/structuredExtractor';
+import { aggregateChunkResults, type AggregatedData } from '../lib/formatter/aggregator';
+import { renderTemplate } from '../lib/formatter/templateRenderer';
+import type { ExtractionSchema } from '../lib/formatter/extractionSchema';
 
 // ─── State ────────────────────────────────────────────────────
 
@@ -80,6 +85,13 @@ const _state = $state<FormatterState>({
   // Time tracking for ETA
   chunkTimings: [],
   estimatedTimeRemaining: null,
+  // Structured extraction state (Phase 4)
+  extractionSchema: null,
+  schemaGenerationState: 'idle',
+  structuredResults: [],
+  aggregatedData: null,
+  renderedReport: null,
+  structuredExtractionState: 'idle',
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -1233,6 +1245,13 @@ export function resetExtraction(): void {
   resetTaskPlan();
   clearStreamingText();
   clearPipelineData();
+  // Also reset structured extraction state
+  _state.extractionSchema = null;
+  _state.schemaGenerationState = 'idle';
+  _state.structuredResults = [];
+  _state.aggregatedData = null;
+  _state.renderedReport = null;
+  _state.structuredExtractionState = 'idle';
 }
 
 /**
@@ -1240,6 +1259,161 @@ export function resetExtraction(): void {
  */
 export function toggleShowAllResults(): void {
   _state.showAllResults = !_state.showAllResults;
+}
+
+// ─── Structured Extraction (Phase 4) ──────────────────────────────────────
+
+/**
+ * Generate extraction schema from desired format.
+ * Calls the LLM to generate a structured schema based on user's format description.
+ */
+export async function generateSchema(): Promise<void> {
+  const { desiredFormat } = _state;
+  const backend = getFormatterBackend();
+
+  if (!desiredFormat.trim()) {
+    setErrorMessage('Desired format is required to generate schema');
+    _state.schemaGenerationState = 'error';
+    return;
+  }
+
+  _state.schemaGenerationState = 'generating';
+  _state.errorMessage = null;
+
+  try {
+    logger.info('Schema generation: Starting');
+    const schema = await generateExtractionSchema(backend, desiredFormat);
+
+    if (schema) {
+      _state.extractionSchema = schema;
+      _state.schemaGenerationState = 'complete';
+      logger.info('Schema generation: Complete', { fields: schema.fields.length });
+    } else {
+      _state.errorMessage = 'Failed to generate schema';
+      _state.schemaGenerationState = 'error';
+      logger.warn('Schema generation: Failed - no schema returned');
+    }
+  } catch (err) {
+    _state.errorMessage = err instanceof Error ? err.message : 'Schema generation failed';
+    _state.schemaGenerationState = 'error';
+    logger.error('Schema generation: Error', err);
+  }
+}
+
+/**
+ * Run the full structured extraction pipeline.
+ * Orchestrates: schema generation → per-chunk extraction → aggregation → rendering.
+ */
+export async function runStructuredExtraction(): Promise<void> {
+  const { refinedChunks, desiredFormat, extractionSchema } = _state;
+  const backend = getFormatterBackend();
+
+  if (refinedChunks.length === 0) {
+    setErrorMessage('No refined chunks available. Run refinement first.');
+    _state.structuredExtractionState = 'error';
+    return;
+  }
+
+  _state.isProcessing = true;
+  _state.errorMessage = null;
+  _state.runStartedAt = Date.now();
+  _state.runCompletedAt = null;
+
+  try {
+    // Step 1: Generate schema if not already present
+    if (!extractionSchema || _state.schemaGenerationState !== 'complete') {
+      setCurrentPhase('Generating extraction schema...');
+      await generateSchema();
+
+      if (_state.schemaGenerationState !== 'complete' || !_state.extractionSchema) {
+        throw new Error(_state.errorMessage ?? 'Schema generation failed');
+      }
+    }
+
+    // We know schema is not null here due to the checks above
+    const schema = _state.extractionSchema!;
+
+    // Step 2: Extract from all chunks
+    _state.structuredExtractionState = 'extracting';
+    setCurrentPhase(`Extracting from ${refinedChunks.length} chunks...`);
+    logger.info('Structured extraction: Starting per-chunk extraction');
+
+    _state.structuredResults = [];
+    const extractionResults: ChunkExtractionResult[] = [];
+
+    for (let i = 0; i < refinedChunks.length; i++) {
+      setChunkPhase(`Extracting chunk ${i + 1}/${refinedChunks.length}`);
+      
+      // Use streaming callback for live feedback
+      clearActiveChunkStreaming();
+      setActiveStreamingChunk(i);
+      setActiveProcessingChunkIndex(i);
+
+      // We need to import extractChunkData directly
+      const { extractChunkData } = await import('../lib/formatter/structuredExtractor');
+      const result = await extractChunkData(refinedChunks[i]!, i, schema, backend, {
+        onToken: (token) => {
+          appendActiveChunkToken(token);
+        },
+      });
+
+      extractionResults.push(result);
+      setActiveStreamingChunk(null);
+      setActiveProcessingChunkIndex(null);
+    }
+
+    _state.structuredResults = extractionResults;
+    logger.info('Structured extraction: Per-chunk extraction complete', { chunks: extractionResults.length });
+
+    // Step 3: Aggregate results
+    _state.structuredExtractionState = 'aggregating';
+    setCurrentPhase('Aggregating results...');
+    const aggregated = aggregateChunkResults(extractionResults, schema.fields);
+    _state.aggregatedData = aggregated;
+    logger.info('Structured extraction: Aggregation complete');
+
+    // Step 4: Render with template
+    _state.structuredExtractionState = 'rendering';
+    setCurrentPhase('Rendering report...');
+    
+    // Use a default template that shows all fields if no template in schema
+    const template = schema.fields
+      .map(f => `{{${f.path}}}: {{{${f.path}}}}`)
+      .join('\n');
+    
+    const rendered = renderTemplate(template, aggregated);
+    _state.renderedReport = rendered;
+    logger.info('Structured extraction: Rendering complete');
+
+    // Final state
+    _state.structuredExtractionState = 'complete';
+    _state.runCompletedAt = Date.now();
+    setCurrentPhase('Structured extraction complete');
+    logger.info('Structured extraction: Pipeline complete');
+
+  } catch (err) {
+    _state.runCompletedAt = Date.now();
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    logger.error('Structured extraction error:', err);
+    setErrorMessage(errorMsg);
+    _state.structuredExtractionState = 'error';
+    setCurrentPhase(`Error: ${errorMsg}`);
+  } finally {
+    _state.isProcessing = false;
+    setActiveProcessingChunkIndex(null);
+  }
+}
+
+/**
+ * Reset structured extraction state.
+ */
+export function resetStructuredExtraction(): void {
+  _state.extractionSchema = null;
+  _state.schemaGenerationState = 'idle';
+  _state.structuredResults = [];
+  _state.aggregatedData = null;
+  _state.renderedReport = null;
+  _state.structuredExtractionState = 'idle';
 }
 
 // ─── Local Storage Persistence ────────────────────────────────
@@ -1314,4 +1488,11 @@ export function resetFormatterState(): void {
   clearStreamingText();
   invalidateRefinementCache();
   clearLocalStorage();
+  // Reset structured extraction state
+  _state.extractionSchema = null;
+  _state.schemaGenerationState = 'idle';
+  _state.structuredResults = [];
+  _state.aggregatedData = null;
+  _state.renderedReport = null;
+  _state.structuredExtractionState = 'idle';
 }

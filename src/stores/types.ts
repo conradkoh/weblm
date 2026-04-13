@@ -9,6 +9,9 @@ import type { ChatMessage } from '../types';
 import type { ModelProgress } from '../engine/types';
 import type { Theme } from '../settings';
 import type { CohesionAnalysis } from '../lib/formatter/cohesionAnalyzer';
+import type { ExtractionSchema as LibExtractionSchema, SchemaField } from '../lib/formatter/extractionSchema';
+import type { ChunkExtractionResult } from '../lib/formatter/structuredExtractor';
+import type { AggregatedData } from '../lib/formatter/aggregator';
 
 export type { ChatMessage, ModelProgress, Theme, CohesionAnalysis };
 
@@ -170,6 +173,12 @@ export type RefinementState = 'idle' | 'chunking' | 'formatting' | 'analyzing' |
 
 export type ExtractionState = 'idle' | 'parsing' | 'extracting' | 'complete' | 'error';
 
+// Schema generation state
+export type SchemaGenerationState = 'idle' | 'generating' | 'complete' | 'error';
+
+// Structured extraction state
+export type StructuredExtractionState = 'idle' | 'extracting' | 'aggregating' | 'rendering' | 'complete' | 'error';
+
 export interface TaskPhase {
   name: string;         // e.g., "Formatting", "Analyzing", "Refining"
   totalSteps: number;   // total steps in this phase (e.g., number of chunks)
@@ -250,4 +259,12 @@ export interface FormatterState {
   // Time tracking for ETA
   chunkTimings: number[];  // array of ms durations for completed chunks
   estimatedTimeRemaining: number | null;  // estimated ms remaining
+  
+  // Structured extraction state (Phase 4)
+  extractionSchema: LibExtractionSchema | null;  // Generated schema from desired format
+  schemaGenerationState: SchemaGenerationState;    // Schema generation progress
+  structuredResults: ChunkExtractionResult[];     // Per-chunk extraction results
+  aggregatedData: AggregatedData | null;           // Merged data from all chunks
+  renderedReport: string | null;                   // Final template output
+  structuredExtractionState: StructuredExtractionState;  // Structured extraction progress
 }
