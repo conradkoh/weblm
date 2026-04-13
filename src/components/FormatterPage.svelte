@@ -13,6 +13,7 @@
   import ChunkList from './ChunkList.svelte';
   import ChunkDetail from './ChunkDetail.svelte';
   import StreamingChunkCard from './StreamingChunkCard.svelte';
+  import FollowLatestButton from './FollowLatestButton.svelte';
   import { setScreen } from '../stores/appStore.svelte';
   import { getEngineState, loadModel } from '../stores/engineStore.svelte';
   import {
@@ -39,6 +40,7 @@
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
   import { renderMarkdown } from '../lib/markdown';
+  import { useAutoScroll } from '../lib/hooks/useAutoScroll';
   import { TEST_SOURCE_CONTENT, TEST_DESIRED_FORMAT } from '../lib/formatter/testData';
   import type { ExtractionResult } from '../stores/types';
 
@@ -310,6 +312,28 @@
     }
     
     return 'pending';
+  }
+
+  // Auto-scroll state and handlers for output display
+  let outputContainerRef: HTMLDivElement | null = null;
+  
+  const autoScroll = useAutoScroll(() => outputContainerRef);
+  
+  // Track previous chunk count to detect new content additions
+  let prevChunkCount = $state(0);
+  
+  // Effect: auto-scroll when new chunks complete and following
+  $effect(() => {
+    const currentCount = formatterState.partialRefinedChunks.length;
+    if (showProgressiveOutput && currentCount > prevChunkCount && autoScroll.isFollowing) {
+      autoScroll.scrollToBottom();
+    }
+    prevChunkCount = currentCount;
+  });
+  
+  // Handler for scroll events
+  function handleOutputScroll(e: Event): void {
+    autoScroll.onScroll(e);
   }
 
   // Handler for chunk selection
@@ -698,7 +722,11 @@
       </div>
       
       <!-- Output content based on preview mode -->
-      <div id="output-display" class="flex-1 min-h-[200px] max-h-[300px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 overflow-y-auto">
+      <div id="output-display" bind:this={outputContainerRef} onscroll={handleOutputScroll}
+           class="relative flex-1 min-h-[200px] max-h-[300px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 overflow-y-auto">
+        
+        <!-- Follow latest button (appears when user scrolls away) -->
+        <FollowLatestButton visible={!autoScroll.isFollowing && showProgressiveOutput} onclick={autoScroll.scrollToBottom} />
         
         {#if formatterState.previewMode === 'preview' && formatterState.refinedChunks.length > 0}
           <!-- Preview mode: rendered markdown of all chunks -->
