@@ -635,48 +635,48 @@
         <label for="format-input" class="font-semibold text-sm text-gray-700 dark:text-slate-300">
           Desired Format
         </label>
-        {#if formatterState.refinedChunks.length > 0}
-          <div class="flex items-center gap-2">
-            <!-- Generate Schema button -->
-            <Button
-              variant="outline"
-              size="sm"
-              title={
-                formatterState.schemaGenerationState === 'generating' ? 'Generating schema...' :
-                !formatterState.desiredFormat.trim() ? 'Add desired format first' :
-                formatterState.isProcessing ? 'Wait for processing to complete' :
-                'Generate schema from desired format'
-              }
-              disabled={
-                formatterState.schemaGenerationState === 'generating' ||
-                !formatterState.desiredFormat.trim() ||
-                formatterState.isProcessing
-              }
-              onclick={generateSchema}
-            >
-              {formatterState.schemaGenerationState === 'generating' ? 'Generating...' : 'Generate Schema'}
-            </Button>
-            <!-- Run Extraction button (structured) -->
-            <Button
-              variant="default"
-              size="sm"
-              title={
-                !formatterState.extractionSchema ? 'Generate a schema first' :
-                formatterState.isProcessing ? 'Processing in progress' :
-                formatterState.refinedChunks.length === 0 ? 'Refine source first' :
-                'Run structured extraction'
-              }
-              disabled={
-                !formatterState.extractionSchema ||
-                formatterState.isProcessing ||
-                formatterState.refinedChunks.length === 0
-              }
-              onclick={runStructuredExtraction}
-            >
-              {formatterState.isProcessing ? 'Processing...' : 'Run Structured Extraction'}
-            </Button>
-          </div>
-        {/if}
+        <div class="flex items-center gap-2">
+          <!-- Generate Schema button -->
+          <Button
+            variant="outline"
+            size="sm"
+            title={
+              formatterState.schemaGenerationState === 'generating' ? 'Generating schema...' :
+              !formatterState.desiredFormat.trim() ? 'Add desired format first' :
+              !modelLoaded ? 'Load a model first' :
+              formatterState.isProcessing ? 'Wait for processing to complete' :
+              'Generate schema from desired format'
+            }
+            disabled={
+              formatterState.schemaGenerationState === 'generating' ||
+              !formatterState.desiredFormat.trim() ||
+              !modelLoaded ||
+              formatterState.isProcessing
+            }
+            onclick={generateSchema}
+          >
+            {formatterState.schemaGenerationState === 'generating' ? 'Generating...' : 'Generate Schema'}
+          </Button>
+          <!-- Run Extraction button (structured) -->
+          <Button
+            variant="default"
+            size="sm"
+            title={
+              !formatterState.extractionSchema ? 'Generate a schema first' :
+              formatterState.isProcessing ? 'Processing in progress' :
+              formatterState.refinedChunks.length === 0 ? 'Refine source first' :
+              'Run structured extraction'
+            }
+            disabled={
+              !formatterState.extractionSchema ||
+              formatterState.isProcessing ||
+              formatterState.refinedChunks.length === 0
+            }
+            onclick={runStructuredExtraction}
+          >
+            {formatterState.isProcessing ? 'Processing...' : 'Run Structured Extraction'}
+          </Button>
+        </div>
       </div>
       <Textarea
         id="format-input"
