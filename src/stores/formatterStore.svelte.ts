@@ -18,6 +18,7 @@ import { processChunks, type ExtractionProgress } from '../lib/formatter/extract
 import { processPipeline } from '../lib/formatter/pipelineProcessor';
 import { formatChunkToMarkdown } from '../lib/formatter/markdownFormatter';
 import { getEngineInstance } from '../engine/engine-factory';
+import { computeContentHash, createCacheEntry, getIndicesToPrune, getCacheStats } from '../lib/formatter/chunkCacheUtils';
 import { logger } from '../logger';
 
 // ─── State ────────────────────────────────────────────────────
@@ -92,17 +93,17 @@ export function getFormatterState(): FormatterState {
 
 export function setSourceContent(content: string): void {
   _state.sourceContent = content;
-  saveToLocalStorage();
+  loadFromLocalStorage();
 }
 
 export function setDesiredFormat(format: string): void {
   _state.desiredFormat = format;
-  saveToLocalStorage();
+  loadFromLocalStorage();
 }
 
 export function setSelectedModelId(modelId: string | null): void {
   _state.selectedModelId = modelId;
-  saveToLocalStorage();
+  loadFromLocalStorage();
 }
 
 export function clearOutputResults(): void {
@@ -137,18 +138,18 @@ export function setExtractionState(state: ExtractionState): void {
 // Worker Pool configuration setters (Experimental)
 export function setUseWorkerPool(use: boolean): void {
   _state.useWorkerPool = use;
-  saveToLocalStorage();
+  loadFromLocalStorage();
 }
 
 export function setWorkerPoolSize(size: number): void {
   // Clamp to valid range 1-4
   _state.workerPoolSize = Math.max(1, Math.min(4, size));
-  saveToLocalStorage();
+  loadFromLocalStorage();
 }
 
 export function setWorkerModelId(modelId: string): void {
   _state.workerModelId = modelId;
-  saveToLocalStorage();
+  loadFromLocalStorage();
 }
 
 // Chunk progress tracking setters
@@ -664,10 +665,13 @@ export function isChunkCached(index: number, chunkText: string): boolean {
 /**
  * Store a refined chunk in the cache.
  */
-export function cacheRefinedChunk(index: number, chunkText: string, refinedText: string): void {
-  const hash = computeContentHash(chunkText, chunkText.length);
+export function cacheRefinedChunk(index: number, chunkText: string | null | undefined, refinedText: string | null | undefined): void {
+  if (!chunkText || !refinedText) {
+    logger.warn(`ChunkCache: skipping cache for chunk ${index} — missing text`);
+    return;
+  }
   _state.chunkCache[index] = {
-    hash,
+    hash: computeContentHash(chunkText, chunkText.length),
     refinedText,
     refinedAt: Date.now(),
   };
@@ -678,9 +682,7 @@ export function cacheRefinedChunk(index: number, chunkText: string, refinedText:
  * Called when new chunk count is less than previous.
  */
 export function pruneChunkCache(newChunkCount: number): void {
-  const oldIndices = Object.keys(_state.chunkCache)
-    .map(k => parseInt(k, 10))
-    .filter(i => i >= newChunkCount);
+  const oldIndices = getIndicesToPrune(_state.chunkCache, newChunkCount);
   
   for (const idx of oldIndices) {
     delete _state.chunkCache[idx];
@@ -691,10 +693,6 @@ export function pruneChunkCache(newChunkCount: number): void {
   }
 }
 
-
-/**
- * Clear all chunk cache entries.
- */
 /**
  * Get cache statistics for logging.
  */
@@ -740,37 +738,7 @@ export function setActiveProcessingChunkIndex(index: number | null): void {
   _state.activeProcessingChunkIndex = index;
 }
 
-/**
- * Simple hash function for content change detection using djb2 algorithm.
- * 
- * ⚠️ WARNING: For very large content (1MB+), djb2 hash collisions become more likely.
- * This is acceptable for UX caching purposes but not for security.
- * For extra safety, we also store content length alongside hash.
- * 
- * @param content - The content to hash
- * @param contentLength - Optional pre-computed length (avoids re-calculation)
- * @returns A hex string representation of the hash
- */
-export function computeContentHash(content: string, contentLength?: number): string {
-  const len = contentLength ?? content.length;
-  let hash = 5381;
-  // Use first and last 1KB plus length for better uniqueness
-  const sampleSize = Math.min(1024, len);
-  const sample = (len > sampleSize * 2)
-    ? content.slice(0, sampleSize) + content.slice(-sampleSize)
-    : content;
-  
-  for (let i = 0; i < sample.length; i++) {
-    hash = ((hash << 5) + hash) + sample.charCodeAt(i);
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  
-  // Mix in length to differentiate content with same sampled prefix
-  hash = ((hash << 5) + hash) + (len % 0xFFFFFFFF);
-  hash = hash & hash;
-  
-  return hash.toString(16);
-}
+// computeContentHash is imported from '../lib/formatter/chunkCacheUtils'
 
 /**
  * Check if content matches stored hash (with length verification).
@@ -1038,7 +1006,11 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
           } else {
             refinedChunks[i] = partialResult.refinedChunks[refinedIdx] ?? formattedChunks[i]!;
             // Cache the refined chunk
-            cacheRefinedChunk(i, formattedChunks[i]!, refinedChunks[i]!);
+            const formatted = formattedChunks[i];
+            const refined = refinedChunks[i];
+            if (formatted && refined) {
+              cacheRefinedChunk(i, formatted, refined);
+            }
             refinedIdx++;
           }
         }
@@ -1053,7 +1025,11 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
         refinedChunks = refinementResult.refinedChunks;
         // Cache all refined chunks
         for (let i = 0; i < refinedChunks.length; i++) {
-          cacheRefinedChunk(i, formattedChunks[i]!, refinedChunks[i]!);
+          const formatted = formattedChunks[i];
+          const refined = refinedChunks[i];
+          if (formatted && refined) {
+            cacheRefinedChunk(i, formatted, refined);
+          }
         }
       } else {
         refinedChunks = formattedChunks;
@@ -1280,22 +1256,6 @@ interface StoredData {
   workerModelId: string;
 }
 
-function saveToLocalStorage(): void {
-  try {
-    const data: StoredData = {
-      sourceContent: _state.sourceContent,
-      desiredFormat: _state.desiredFormat,
-      selectedModelId: _state.selectedModelId,
-      useWorkerPool: _state.useWorkerPool,
-      workerPoolSize: _state.workerPoolSize,
-      workerModelId: _state.workerModelId,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (err) {
-    logger.error('failed to save formatter state to localStorage:', err);
-  }
-}
-
 export function loadFromLocalStorage(): void {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -1307,7 +1267,7 @@ export function loadFromLocalStorage(): void {
       _state.useWorkerPool = data.useWorkerPool ?? false;
       _state.workerPoolSize = data.workerPoolSize ?? 2;
       _state.workerModelId = data.workerModelId ?? '';
-      logger.debug('loaded formatter state from localStorage');
+      logger.debug('Loaded formatter state from localStorage');
     }
   } catch (err) {
     logger.error('failed to load formatter state from localStorage:', err);
