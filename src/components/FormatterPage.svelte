@@ -10,6 +10,7 @@
   import { Separator } from '$ui/separator';
   import { Textarea } from '$ui/textarea';
   import ModelSelector from './ModelSelector.svelte';
+  import ChunkList from './ChunkList.svelte';
   import { setScreen } from '../stores/appStore.svelte';
   import { getEngineState, loadModel } from '../stores/engineStore.svelte';
   import {
@@ -32,6 +33,7 @@
     setPreviewMode,
     nextChunk,
     prevChunk,
+    selectChunkForInspection,
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
   import { renderMarkdown } from '../lib/markdown';
@@ -261,6 +263,21 @@
     formatterState.extractionState !== 'error'
   );
 
+  // Check if refinement has started (we have pipeline data)
+  const hasPipelineData = $derived(
+    formatterState.pipelineData.chunks.length > 0
+  );
+
+  // Check if processing has started (chunks exist OR we have results)
+  const processingStarted = $derived(
+    hasPipelineData || formatterState.refinedChunks.length > 0
+  );
+
+  // Handler for chunk selection
+  function handleSelectChunk(index: number): void {
+    selectChunkForInspection(index);
+  }
+
   // Computed values for stats
   const relevantCount = $derived(
     formatterState.extractionResults.filter(
@@ -489,14 +506,23 @@
           {/if}
         </div>
       </div>
-      <Textarea
-        id="source-input"
-        placeholder="Paste your source content here..."
-        class="flex-1 min-h-[200px] max-h-[300px] resize-none overflow-y-auto"
-        value={formatterState.sourceContent}
-        oninput={handleSourceChange}
-        disabled={isRefining || isExtracting}
-      />
+      <!-- Source column content: textarea or ChunkList -->
+      {#if processingStarted}
+        <ChunkList
+          chunks={formatterState.pipelineData.chunks}
+          selectedIndex={formatterState.pipelineData.selectedChunkIndex}
+          onSelectChunk={handleSelectChunk}
+        />
+      {:else}
+        <Textarea
+          id="source-input"
+          placeholder="Paste your source content here..."
+          class="flex-1 min-h-[200px] max-h-[300px] resize-none overflow-y-auto"
+          value={formatterState.sourceContent}
+          oninput={handleSourceChange}
+          disabled={isRefining || isExtracting}
+        />
+      {/if}
     </div>
 
     <!-- Desired Format Column -->
