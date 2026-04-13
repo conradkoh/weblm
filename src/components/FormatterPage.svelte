@@ -18,6 +18,8 @@
   import PhaseTransitionBanner from './PhaseTransitionBanner.svelte';
   import FormatterLanding from './FormatterLanding.svelte';
   import FormatterModelBar from './FormatterModelBar.svelte';
+  import QueueSidebar from './QueueSidebar.svelte';
+  import { enqueue, startJob, updateStreamingText, completeJob, failJob, getJobQueueState } from '../stores/jobQueueStore.svelte';
   import { setScreen } from '../stores/appStore.svelte';
   import { getEngineState, loadModel } from '../stores/engineStore.svelte';
   import {
@@ -77,6 +79,10 @@
     // Force refresh to show workspace
     loadFromLocalStorage();
   }
+
+  // Queue sidebar state
+  let sidebarCollapsed = $state(false);
+  const queueState = getJobQueueState();
 
   // Load persisted data on mount
   $effect(() => {
@@ -540,7 +546,9 @@
     <FormatterLanding onModelLoaded={handleModelLoaded} />
   {:else}
     <!-- Workspace (model loaded) -->
-    <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 min-h-0 max-h-[calc(100vh-180px)] overflow-hidden">
+    <div class="flex flex-1 min-h-0 max-h-[calc(100vh-180px)]">
+      <!-- 3-column grid -->
+      <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 overflow-hidden">
 
     <!-- Empty State CTA: shown when no source content -->
     {#if !formatterState.sourceContent.trim() && !formatterState.isProcessing}
@@ -1054,7 +1062,11 @@
         {/if}
       </div>
     </div>
+
+    <!-- Queue Sidebar -->
+    <QueueSidebar bind:collapsed={sidebarCollapsed} />
   </div>
+  <!-- End of workspace flex container -->
 
   <!-- Progress bar (shown while processing) -->
   {#if formatterState.isProcessing && formatterState.taskPlan.status === 'running'}
@@ -1120,7 +1132,6 @@
       💡 Click "Refine Source" to process your content
     </div>
   {/if}
-
-    <!-- End of Workspace -->
-  {/if}
+</div>
+{/if}
 </div>
