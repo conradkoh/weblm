@@ -38,6 +38,7 @@
     nextChunk,
     prevChunk,
     selectChunkForInspection,
+    retryChunk,
   } from '../stores/formatterStore.svelte';
   import { getChunkCount } from '../lib/formatter/chunker';
   import { renderMarkdown } from '../lib/markdown';
@@ -799,6 +800,7 @@
                 {index}
                 {status}
                 streamingText={status === 'streaming' ? formatterState.streamingText : ''}
+                onRetry={() => retryChunk(index)}
               />
             {/each}
           </div>

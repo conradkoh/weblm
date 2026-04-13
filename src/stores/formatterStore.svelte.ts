@@ -16,6 +16,7 @@ import { getModelInfo } from '../config';
 import { estimateTokenCount } from '../lib/formatter/tokenizer';
 import { processChunks, type ExtractionProgress } from '../lib/formatter/extractionEngine';
 import { processPipeline } from '../lib/formatter/pipelineProcessor';
+import { formatChunkToMarkdown } from '../lib/formatter/markdownFormatter';
 import { getEngineInstance } from '../engine/engine-factory';
 import { logger } from '../logger';
 
@@ -286,6 +287,90 @@ export function updateTimeEstimate(): void {
   _state.estimatedTimeRemaining = Math.round(avgTimePerChunk * remainingChunks);
 }
 
+/**
+ * Retry formatting a single chunk without re-running the full pipeline.
+ * @param index The chunk index to retry
+ */
+export async function retryChunk(index: number): Promise<void> {
+  // Don't allow retry while already processing
+  if (_state.isProcessing) {
+    logger.warn('RetryChunk: already processing, ignoring');
+    return;
+  }
+  
+  // Get the raw chunk text from pipeline data
+  const chunk = _state.pipelineData.chunks[index];
+  if (!chunk) {
+    logger.error(`RetryChunk: no chunk at index ${index}`);
+    return;
+  }
+  
+  const rawText = chunk.rawText;
+  
+  logger.info(`RetryChunk: retrying chunk ${index}`);
+  
+  // Set processing state
+  _state.isProcessing = true;
+  _state.refinementState = 'formatting';
+  setActiveStreamingChunk(index);
+  setActiveProcessingChunkIndex(index);
+  clearActiveChunkStreaming();
+  
+  // Mark chunk as formatting in pipeline data
+  setChunkFormatting(index);
+  
+  try {
+    // Get the formatter backend
+    const backend = getFormatterBackend();
+    
+    // Format the chunk with streaming
+    const formattedText = await formatChunkToMarkdown(rawText, backend, {
+      onToken: (token) => {
+        _state.activeChunkStreamingText += token;
+      },
+    });
+    
+    // Update pipeline data with new formatted text
+    updateChunkFormatting(index, formattedText);
+    setChunkRefined(index);
+    
+    // Update refinedChunks at this index
+    const newRefinedChunks = [..._state.refinedChunks];
+    newRefinedChunks[index] = formattedText;
+    setRefinedChunks(newRefinedChunks);
+    
+    // Update partialRefinedChunks at this index
+    const newPartialChunks = [..._state.partialRefinedChunks];
+    newPartialChunks[index] = formattedText;
+    _state.partialRefinedChunks = newPartialChunks;
+    
+    // Update chunk cache for future resume
+    const cacheKey = index;
+    _state.chunkCache[cacheKey] = {
+      hash: '', // Will be computed on next run
+      refinedText: formattedText,
+      refinedAt: Date.now(),
+    };
+    
+    logger.info(`RetryChunk: chunk ${index} reformatted successfully`);
+  } catch (error) {
+    logger.error(`RetryChunk: failed for chunk ${index}`, error);
+    _state.errorMessage = `Retry failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    _state.refinementState = 'error';
+  } finally {
+    // Clear active streaming state
+    _state.activeStreamingChunkIndex = null;
+    _state.activeChunkStreamingText = '';
+    _state.activeProcessingChunkIndex = null;
+    _state.isProcessing = false;
+    
+    // Restore refinement state if we were complete
+    if (_state.refinedChunks.length > 0) {
+      _state.refinementState = 'complete';
+    }
+  }
+}
+
 export function addPartialExtractionResult(result: ExtractionResult): void {
   _state.partialExtractionResults = [..._state.partialExtractionResults, result];
 }
@@ -523,6 +608,26 @@ export function setChunkRefining(index: number): void {
     const chunk: ChunkPipelineData = {
       ...existing,
       status: 'refining',
+    };
+    _state.pipelineData.chunks = [
+      ...chunks.slice(0, index),
+      chunk,
+      ...chunks.slice(index + 1),
+    ];
+  }
+}
+
+/**
+ * Mark a chunk as refined.
+ */
+export function setChunkRefined(index: number): void {
+  const chunks = _state.pipelineData.chunks;
+  if (index >= 0 && index < chunks.length) {
+    const existing = chunks[index]!;
+    const chunk: ChunkPipelineData = {
+      ...existing,
+      status: 'refined',
+      refinedAt: Date.now(),
     };
     _state.pipelineData.chunks = [
       ...chunks.slice(0, index),
