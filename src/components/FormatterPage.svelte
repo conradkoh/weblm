@@ -14,6 +14,7 @@
   import ChunkDetail from './ChunkDetail.svelte';
   import StreamingChunkCard from './StreamingChunkCard.svelte';
   import FollowLatestButton from './FollowLatestButton.svelte';
+  import PhaseTransitionBanner from './PhaseTransitionBanner.svelte';
   import { setScreen } from '../stores/appStore.svelte';
   import { getEngineState, loadModel } from '../stores/engineStore.svelte';
   import {
@@ -871,36 +872,22 @@
   {#if formatterState.isProcessing && formatterState.taskPlan.status === 'running'}
     {@const plan = formatterState.taskPlan}
     {@const currentPhase = plan.phases[plan.currentPhaseIndex]}
-    {@const totalPhases = plan.phases.length}
     {@const phaseNum = plan.currentPhaseIndex + 1}
     <div class="px-4 py-3 bg-gray-100 dark:bg-slate-800/80 flex-shrink-0">
-      <!-- Phase indicator -->
-      <div class="flex items-center justify-between mb-1">
-        <span class="text-xs font-medium text-gray-700 dark:text-slate-300">
-          Phase {phaseNum} of {totalPhases}: {currentPhase?.name ?? 'Processing'}
-        </span>
+      <PhaseTransitionBanner
+        currentPhase="Phase {phaseNum} of {plan.phases.length}: {currentPhase?.name ?? 'Processing'}"
+        currentStep={currentPhase?.completedSteps ?? 0}
+        totalSteps={currentPhase?.totalSteps ?? 1}
+        estimatedTimeRemaining={formatterState.estimatedTimeRemaining}
+        phases={plan.phases.map((p, i) => ({
+          name: p.name,
+          status: i < plan.currentPhaseIndex ? 'completed' : i === plan.currentPhaseIndex ? 'active' : 'pending'
+        }))}
+      />
+      <div class="flex items-center gap-1 mt-2">
         <span class="text-xs text-gray-500 dark:text-slate-500">
           Running... {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
         </span>
-      </div>
-      <!-- Progress bar -->
-      <div class="w-full h-2 rounded-full bg-gray-300 dark:bg-slate-600 overflow-hidden">
-        <div 
-          class="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all duration-300"
-          style="width: {currentPhase && currentPhase.totalSteps > 0 ? Math.round((currentPhase.completedSteps / currentPhase.totalSteps) * 100) : 0}%"
-        ></div>
-      </div>
-      <!-- Overall progress dots -->
-      <div class="flex items-center gap-1 mt-2">
-        {#each plan.phases as phase, i}
-          <div class="flex items-center gap-1">
-            <div class="w-2 h-2 rounded-full {i < plan.currentPhaseIndex ? 'bg-green-500' : i === plan.currentPhaseIndex ? 'bg-indigo-500 animate-pulse' : 'bg-gray-300 dark:bg-slate-600'}"></div>
-            <span class="text-xs {i === plan.currentPhaseIndex ? 'text-gray-700 dark:text-slate-300' : 'text-gray-400 dark:text-slate-500'}">{phase.name}</span>
-            {#if phase.durationMs}
-              <span class="text-xs text-gray-400 dark:text-slate-600">{formatDuration(phase.durationMs)}</span>
-            {/if}
-          </div>
-        {/each}
       </div>
     </div>
   {:else if formatterState.isProcessing}

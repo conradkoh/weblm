@@ -247,4 +247,7 @@ export interface FormatterState {
   activeChunkStreamingText: string;          // accumulated tokens for active chunk
   // Active processing chunk index (for source column highlighting)
   activeProcessingChunkIndex: number | null;
+  // Time tracking for ETA
+  chunkTimings: number[];  // array of ms durations for completed chunks
+  estimatedTimeRemaining: number | null;  // estimated ms remaining
 }

@@ -75,6 +75,9 @@ const _state = $state<FormatterState>({
   activeChunkStreamingText: '',
   // Active processing chunk index (for source column highlighting)
   activeProcessingChunkIndex: null,
+  // Time tracking for ETA
+  chunkTimings: [],
+  estimatedTimeRemaining: null,
 });
 
 // ─── Getters ──────────────────────────────────────────────────
@@ -251,6 +254,36 @@ export function clearStreamingText(): void {
 // Partial results functions for progressive output
 export function addPartialRefinedChunk(chunk: string): void {
   _state.partialRefinedChunks = [..._state.partialRefinedChunks, chunk];
+}
+
+/**
+ * Record the timing for a completed chunk.
+ * @param durationMs Time in milliseconds it took to process this chunk
+ */
+export function addChunkTiming(durationMs: number): void {
+  _state.chunkTimings = [..._state.chunkTimings, durationMs];
+}
+
+/**
+ * Update the estimated time remaining based on chunk timings.
+ * Calculates average time per chunk and multiplies by remaining chunks.
+ */
+export function updateTimeEstimate(): void {
+  const { chunkTimings, totalChunks } = _state;
+  const completedChunks = _state.partialRefinedChunks.length;
+  const remainingChunks = totalChunks - completedChunks;
+  
+  if (remainingChunks <= 0 || chunkTimings.length === 0) {
+    _state.estimatedTimeRemaining = null;
+    return;
+  }
+  
+  // Calculate average time per chunk
+  const totalTime = chunkTimings.reduce((sum, t) => sum + t, 0);
+  const avgTimePerChunk = totalTime / chunkTimings.length;
+  
+  // Estimate remaining time
+  _state.estimatedTimeRemaining = Math.round(avgTimePerChunk * remainingChunks);
 }
 
 export function addPartialExtractionResult(result: ExtractionResult): void {
@@ -832,19 +865,32 @@ export async function runRefinement(options?: { force?: boolean }): Promise<void
       await tick(); // Allow UI to repaint after state update
     };
     
-    // Chunk complete callback for progressive output and pipeline observability
-    const onChunkComplete = (formattedChunk: string, index: number) => {
-      addPartialRefinedChunk(formattedChunk);
-      // Update pipeline data with formatting result
-      setChunkFormatting(index);
-      updateChunkFormatting(index, formattedChunk);
-    };
-    
     // Per-chunk streaming callbacks
     const onChunkStreamStart = (index: number) => {
       setActiveStreamingChunk(index);
       setActiveProcessingChunkIndex(index);
       clearActiveChunkStreaming();
+      // Track start time for timing calculation
+      chunkStartTimes.set(index, Date.now());
+    };
+    
+    // Track chunk timing
+    const chunkStartTimes: Map<number, number> = new Map();
+    
+    // Chunk complete callback for progressive output and pipeline observability
+    const onChunkComplete = (formattedChunk: string, index: number) => {
+      // Record timing if we have a start time for this chunk
+      const startTime = chunkStartTimes.get(index);
+      if (startTime !== undefined) {
+        const duration = Date.now() - startTime;
+        addChunkTiming(duration);
+        updateTimeEstimate();
+        chunkStartTimes.delete(index);
+      }
+      addPartialRefinedChunk(formattedChunk);
+      // Update pipeline data with formatting result
+      setChunkFormatting(index);
+      updateChunkFormatting(index, formattedChunk);
     };
     
     const onChunkStreamEnd = (index: number) => {
@@ -1016,6 +1062,8 @@ export function resetRefinement(): void {
   _state.isStopped = false;
   _state.previewMode = 'raw';
   _state.currentChunkIndex = 0;
+  _state.chunkTimings = [];
+  _state.estimatedTimeRemaining = null;
   resetTaskPlan();
   clearStreamingText();
   invalidateRefinementCache();
@@ -1148,6 +1196,8 @@ export function resetExtraction(): void {
   _state.runStartedAt = null;
   _state.runCompletedAt = null;
   _state.isStopped = false;
+  _state.chunkTimings = [];
+  _state.estimatedTimeRemaining = null;
   resetTaskPlan();
   clearStreamingText();
   clearPipelineData();
