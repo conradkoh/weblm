@@ -549,6 +549,8 @@
     <div class="flex flex-1 overflow-hidden">
       <!-- Main content area -->
       <div class="flex-1 relative overflow-y-auto">
+        <!-- Grid wrapper for columns -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 h-full">
 
     <!-- Empty State CTA: shown when no source content -->
     {#if !formatterState.sourceContent.trim() && !formatterState.isProcessing}
@@ -1061,6 +1063,8 @@
           </div>
         {/if}
       </div>
+    </div>
+    <!-- End of grid wrapper -->
     </div>
 
     <!-- Queue Sidebar -->
