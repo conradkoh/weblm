@@ -882,18 +882,20 @@
               />
             {/each}
           </div>
-        {:else if formatterState.extractionResults.length === 0}
-          {#if formatterState.refinedChunks.length === 0}
-            <div class="flex items-center justify-center h-full text-gray-400 dark:text-slate-500 text-sm p-4">
-              1. Add source content<br/>2. Click "Refine Source"<br/>3. Add format criteria<br/>4. Click "Run Extraction"
-            </div>
-          {:else}
-            <!-- Raw mode: show chunks as plain text -->
-            <div class="p-3 font-mono text-xs whitespace-pre-wrap text-gray-700 dark:text-slate-300">
-              {formatterState.refinedChunks.join('\n\n---\n\n')}
-            </div>
-          {/if}
+        <!-- Empty state / Raw mode -->
+        {:else if formatterState.refinedChunks.length === 0}
+          <div class="flex items-center justify-center h-full text-gray-400 dark:text-slate-500 text-sm p-4">
+            Output will appear here after processing
+          </div>
         {:else}
+          <!-- Raw mode: show chunks as plain text -->
+          <div class="p-3 font-mono text-xs whitespace-pre-wrap text-gray-700 dark:text-slate-300">
+            {formatterState.refinedChunks.join('\n\n---\n\n')}
+          </div>
+        {/if}
+        
+        <!-- Always show extraction results section -->
+        {#if displayedResults.length > 0}
           <div class="p-3 space-y-3">
             {#each displayedResults as result (result.chunkId)}
               <details class="group">
@@ -942,6 +944,10 @@
                 </div>
               </details>
             {/each}
+          </div>
+        {:else}
+          <div class="p-3 text-gray-400 dark:text-slate-500 text-sm italic">
+            Extraction results will appear here
           </div>
         {/if}
         
