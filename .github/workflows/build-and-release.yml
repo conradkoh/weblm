@@ -78,7 +78,7 @@ jobs:
             VERSION="${{ github.event.release.tag_name }}"
           else
             # Use package.json version as default
-            VERSION="v$(node -p \"require('./package.json').version\")"
+            VERSION="v$(node -p 'require("./package.json").version')"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Tagging release: $VERSION"
