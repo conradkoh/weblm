@@ -541,6 +541,73 @@
   {:else}
     <!-- Workspace (model loaded) -->
     <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 min-h-0 max-h-[calc(100vh-180px)] overflow-hidden">
+
+    <!-- Empty State CTA: shown when no source content -->
+    {#if !formatterState.sourceContent.trim() && !formatterState.isProcessing}
+      <div class="col-span-3 flex items-center justify-center absolute inset-0 bg-gray-50 dark:bg-slate-900 z-10">
+        <div class="text-center space-y-6 max-w-lg px-8">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">
+              Ready to format your content
+            </h2>
+            <p class="text-gray-600 dark:text-slate-400">
+              Add source content to get started, or load test data to explore.
+            </p>
+          </div>
+
+          <!-- Primary CTA: Refine Source -->
+          <div class="space-y-2">
+            <Button
+              variant="default"
+              size="lg"
+              class="w-full"
+              disabled={!formatterState.sourceContent.trim() || isRefining || isExtracting}
+              onclick={() => handleRefineSource(false)}
+            >
+              📝 Refine Source
+            </Button>
+            <p class="text-xs text-gray-500 dark:text-slate-500">
+              Paste or load source content, then refine it for better extraction results.
+            </p>
+          </div>
+
+          <!-- Secondary CTA: Generate Schema -->
+          <div class="space-y-2">
+            <Button
+              variant="outline"
+              size="lg"
+              class="w-full"
+              disabled={!formatterState.desiredFormat.trim() || formatterState.isProcessing}
+              onclick={generateSchema}
+            >
+              📋 Generate Schema
+            </Button>
+            <p class="text-xs text-gray-500 dark:text-slate-500">
+              Define the extraction format you want before processing content.
+            </p>
+          </div>
+
+          <!-- Divider -->
+          <div class="flex items-center gap-4">
+            <div class="flex-1 h-px bg-gray-200 dark:bg-slate-700"></div>
+            <span class="text-xs text-gray-400 dark:text-slate-600">or</span>
+            <div class="flex-1 h-px bg-gray-200 dark:bg-slate-700"></div>
+          </div>
+
+          <!-- Test Data -->
+          <div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onclick={handleLoadTestData}
+            >
+              📋 Load Test Data
+            </Button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <!-- Source Column -->
     <div class="flex flex-col gap-2 min-h-0">
       <div class="flex items-center justify-between">
