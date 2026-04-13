@@ -11,6 +11,7 @@
   import { Textarea } from '$ui/textarea';
   import ModelSelector from './ModelSelector.svelte';
   import ChunkList from './ChunkList.svelte';
+  import ChunkDetail from './ChunkDetail.svelte';
   import { setScreen } from '../stores/appStore.svelte';
   import { getEngineState, loadModel } from '../stores/engineStore.svelte';
   import {
@@ -278,6 +279,23 @@
     selectChunkForInspection(index);
   }
 
+  // Handler for navigation in detail panel
+  function handleDetailNavigate(direction: 'prev' | 'next'): void {
+    const current = formatterState.pipelineData.selectedChunkIndex;
+    if (current === null) return;
+    
+    if (direction === 'prev' && current > 0) {
+      selectChunkForInspection(current - 1);
+    } else if (direction === 'next' && current < formatterState.pipelineData.chunks.length - 1) {
+      selectChunkForInspection(current + 1);
+    }
+  }
+
+  // Handler to close detail panel
+  function handleCloseDetail(): void {
+    selectChunkForInspection(null);
+  }
+
   // Computed values for stats
   const relevantCount = $derived(
     formatterState.extractionResults.filter(
@@ -524,6 +542,17 @@
         />
       {/if}
     </div>
+
+    <!-- Chunk Detail Panel (slide-in when chunk selected) -->
+    {#if formatterState.pipelineData.selectedChunkIndex !== null && formatterState.pipelineData.chunks.length > 0}
+      {@const selectedChunk = formatterState.pipelineData.chunks[formatterState.pipelineData.selectedChunkIndex]!}
+        <ChunkDetail
+          chunk={selectedChunk}
+          totalChunks={formatterState.pipelineData.chunks.length}
+          onNavigate={handleDetailNavigate}
+          onClose={handleCloseDetail}
+        />
+    {/if}
 
     <!-- Desired Format Column -->
     <div class="flex flex-col gap-2 min-h-0">
